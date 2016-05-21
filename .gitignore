@@ -1,0 +1,7 @@
+*~
+*.pyc
+.DS_Store
+*.pem
+.idea/
+/config.py
+/push/config.py
