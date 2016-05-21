@@ -2,7 +2,7 @@
 import requests
 import json
 import logging
-import application
+from models import application
 import time
 
 #文档地址:http://dev.xiaomi.com/doc/?p=533#d5e824

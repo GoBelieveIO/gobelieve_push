@@ -12,7 +12,7 @@ import traceback
 import threading
 import socket
 import binascii
-import application
+from models import application
 import config
 import npush
 

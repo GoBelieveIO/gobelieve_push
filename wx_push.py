@@ -5,7 +5,7 @@ from utils.func import random_ascii_string
 from utils.wx import WX
 import pickle
 import json
-import application
+from models import application
 
 
 class WXUser(object):

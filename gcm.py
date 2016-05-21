@@ -4,7 +4,7 @@ import requesocks
 import json
 import logging
 import time
-import application
+from models import application
 import config
 #文档地址:https://developers.google.com/cloud-messaging/downstream
 GCM_URL = "https://gcm-http.googleapis.com/gcm/send"

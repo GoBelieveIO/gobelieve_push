@@ -11,7 +11,7 @@ from OpenSSL import crypto
 import os
 import traceback
 import threading
-import application
+from models import application
 import config
 import time
 

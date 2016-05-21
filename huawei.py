@@ -3,7 +3,7 @@ import requests
 import json
 import time
 import logging
-import application
+from models import application
 
 #接口文档:http://developer.huawei.com/cn/consumer/wiki/index.php?title=%E6%8E%A5%E5%8F%A3%E6%96%87%E6%A1%A3
 #http://developer.huawei.com/cn/consumer/wiki/index.php?title=%E5%BC%80%E6%94%BE%E5%B9%B3%E5%8F%B0%E9%89%B4%E6%9D%83

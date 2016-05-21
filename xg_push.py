@@ -5,7 +5,7 @@ import time
 import json
 import hashlib
 import logging
-import application
+from models import application
 
 XINGE_API = "http://openapi.xg.qq.com"
 HTTP_METHOD = "POST"
