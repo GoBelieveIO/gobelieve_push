@@ -17,8 +17,8 @@ from gcm import GCMPush
 from mipush import MiPush
 from wx_push import WXPush
 
-import application
-import user
+from models import application
+from models import user
 
 MSG_CUSTOMER = 24 #顾客->客服
 MSG_CUSTOMER_SUPPORT = 25 #客服->顾客
@@ -96,8 +96,7 @@ def push_content(sender_name, body):
             alert = "%s%s"%(sender_name, u"发来一条消息")
     return alert
 
-def ios_push(appid, token, content, badge, extra):
-    sound = "default"
+def ios_push(appid, token, content, badge, sound, extra):
     alert = content
     IOSPush.push(appid, token, alert, sound, badge, extra)
 
@@ -115,7 +114,9 @@ def push_message_u(appid, appname, u, content, extra):
     ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp)
 
     if u.apns_device_token and u.apns_timestamp == ts:
-        ios_push(appid, u.apns_device_token, content, u.unread + 1, extra)
+        sound = 'default'
+        ios_push(appid, u.apns_device_token, content, 
+                 u.unread + 1, sound, extra)
         user.set_user_unread(rds, appid, receiver, u.unread+1)
     elif u.ng_device_token and u.ng_timestamp == ts:
         android_push(appid, appname, u.ng_device_token, content, extra)
@@ -228,10 +229,42 @@ def handle_customer_message(msg):
             push_message(appid, appname, receiver, content, extra)
 
         
+def handle_voip_message(msg):
+    obj = json.loads(msg)
+    appid = obj["appid"]
+    sender = obj["sender"]
+    receiver = obj["receiver"]
+
+    appname = get_title(appid)
+    sender_name = user.get_user_name(rds, appid, sender)
+    u = user.get_user(rds, appid, receiver)
+    if u is None:
+        logging.info("uid:%d nonexist", receiver)
+        return
+    #找出最近绑定的token
+    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp)
+
+    if sender_name:
+        sender_name = sender_name.decode("utf8")
+        content = "%s:%s"%(sender_name, u"请求与你通话")
+    else:
+        content = u"你的朋友请求与你通话"
+
+    if u.apns_device_token and u.apns_timestamp == ts:
+        sound = "apns.caf"
+        badge = 0
+        ios_push(appid, u.apns_device_token, content, badge, sound, {})
+    elif u.mi_device_token and u.mi_timestamp == ts:
+        MiPush.push_message(appid, u.mi_device_token, content)
+    elif u.hw_device_token and u.hw_timestamp == ts:
+        HuaWeiPush.push_message(appid, u.hw_device_token, content)
+    else:
+        logging.info("uid:%d has't device token", receiver)
+
 
 def receive_offline_message():
     while True:
-        item = rds.blpop(("push_queue", "customer_push_queue"))
+        item = rds.blpop(("push_queue", "customer_push_queue", "voip_push_queue"))
         if not item:
             continue
         q, msg = item
@@ -239,6 +272,8 @@ def receive_offline_message():
             handle_im_message(msg)
         elif q == "customer_push_queue":
             handle_customer_message(msg)
+        elif q == "voip_push_queue":
+            handle_voip_message(msg)
         else:
             logging.warning("unknown queue:%s", q)
         
