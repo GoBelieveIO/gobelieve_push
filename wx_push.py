@@ -1,18 +1,27 @@
 # -*- coding: utf-8 -*-
 import time
 import requests
-from utils.func import random_ascii_string
-from utils.wx import WX
 import pickle
 import json
+import logging
+
+from utils.func import random_ascii_string
+
+import config
+if config.DEBUG:
+    from utils.wx import WX2 as WX
+    from utils.wx_api import WXAPI2 as WXAPI
+else:
+    from utils.wx import WX
+    from utils.wx_api import WXAPI
+    
+from models.wx import WX as weixin
 from models import application
 
-
-class WXUser(object):
-    @classmethod
-    def set_seller_id(cls, rds, gh_id, openid, seller_id):
-        key = "wx_users_%s_%s"%(gh_id, openid)
-        rds.hset(key, "seller_id", seller_id)
+#平台appid
+#平台appsecret
+WX_APPID = config.WX_APPID
+WX_APPSECRET = config.WX_APPSECRET
 
 
 def _check_error(result):
@@ -20,55 +29,75 @@ def _check_error(result):
         logging.error("errmsg:%s", result.get('errmsg') or '公众号发送消息未知异常')
     return result
 
-
-
-class WXToken(object):
-    @staticmethod
-    def get_token(rds, wx_appid):
-        """
-        获取token
-        :param force:  不使用缓存token，直接请求新token
-        """
-
-        token = rds.get('wx_token_' + wx_appid)
-        if token:
-            token = pickle.loads(token)
-            access_token = token.get('access_token')
-            expire = token.get('expire')
-            if expire > int(time.time()):
-                return access_token
-
-        return None
-
-    @staticmethod
-    def set_token(rds, wx_appid, access_token, expire):
-        value = pickle.dumps({'access_token': access_token,'expire': expire})
-        rds.set('wx_token_' + wx_appid, value)
-
-    @staticmethod
-    def clean_token(rds, wx_appid):
-        rds.delete('wx_token_' + wx_appid)
-
     
 class WXPush(object):
     mysql = None
     rds = None
     apps = {}
+    
+    @staticmethod
+    def get_component_access_token(rds):
+        WX = weixin
+        component_token = WX.get_component_access_token(rds)
+        if not component_token:
+            ticket = WX.get_ticket(rds)
+            if not ticket:
+                return None
+     
+            wx = WXAPI(WX_APPID, WX_APPSECRET)
+            r = wx.request_token(ticket)
+            logging.debug("request token:%s", r)
+            if r.get('errcode'):
+                logging.error("request token error:%s %s", 
+                              r['errcode'], r['errmsg'])
+                return None
+     
+            access_token = r['component_access_token']
+            expires = r['expires_in']
+            #提前10分钟过期
+            if expires > 20*60:
+                expires = expires - 10*60
+            logging.debug("request component access token:%s expires:%s", 
+                          access_token, r['expires_in'])
+            WX.set_componet_access_token(rds, access_token, expires)
+            
+            component_token = access_token
+     
+        return component_token
 
     @staticmethod
-    def get_token(rds, wx_appid, wx_app_secret):
-        token = WXToken.get_token(rds, wx_appid)
+    def get_token(rds, wx_appid, refresh_token):
+        token = weixin.get_access_token(rds, wx_appid)
         if not token:
-            wx = WX(wx_appid, wx_app_secret)
-            result = wx.request_token()
-            if not result:
+            component_token = WXPush.get_component_access_token(rds)
+            if not component_token:
                 return None
-            access_token = result.get('access_token')
-            exipres_in = result.get('expires_in')
-            expire = int(time.time()) + exipres_in - 100
-            WXToken.set_token(rds, wx_appid, access_token, expire)
-            token = access_token
 
+            wx_api = WXAPI(WX_APPID, WX_APPSECRET, component_token)
+
+            r = wx_api.refresh_auth(wx_appid, refresh_token)
+
+            if r.get('errcode'):
+                logging.error("refresh auto error:%s %s", 
+                              r['errcode'], r['errmsg'])
+                return None
+
+            token = r['authorizer_access_token']
+            expires = r['expires_in']
+            authorizer_refresh_token = r['authorizer_refresh_token']
+
+            #提前10分钟过期
+            if expires > 20*60:
+                expires = expires - 10*60
+
+            if authorizer_refresh_token != refresh_token:
+                logging.error("old refresh token:%s new refresh token:%s", 
+                              refresh_token, authorizer_refresh_token)
+            else:
+                logging.debug("refresh token is unchanged")
+
+            weixin.set_access_token(rds, wx_appid, token, expires)
+            
         return token
 
     @classmethod
@@ -85,27 +114,27 @@ class WXPush(object):
             app["timestamp"] = now
             app["gh_id"] = obj['gh_id']
             app["wx_appid"] = obj['wx_app_id']
-            app["wx_app_secret"] = obj['wx_app_secret']
-            app["template_id"] = obj['template_id']
+            app["wx_refresh_token"] = obj['refresh_token']
+            app["store_id"] = obj['store_id']
             cls.apps[appid] = app
         return app
 
 
     @staticmethod
-    def send_text(wx_appid, wx_app_secret, token, openid, text):
+    def send_text(token, openid, text):
         """
         向用户发送文本消息
         """
-        wx = WX(wx_appid, wx_app_secret, token)
+        wx = WX(token)
         result = wx.send_text_message(openid, text)
         return _check_error(result)
 
     @staticmethod
-    def send_image(wx_appid, wx_app_secret, token, openid, files):
+    def send_image(token, openid, files):
         """
         发送图片
         """
-        wx = WX(wx_appid, wx_app_secret, token)
+        wx = WX(token)
         if wx:
             if isinstance(files, str):
                 res = requests.get(files)
@@ -207,7 +236,7 @@ class WXPush(object):
             logging.warning("can't read wx gh id")
             return False
 
-        token = WXPush.get_token(cls.rds, app['wx_appid'], app['wx_app_secret'])
+        token = WXPush.get_token(cls.rds, app['wx_appid'], app['wx_refresh_token'])
         if not token:
             logging.warning("can't get wx token")
             return False
@@ -215,7 +244,7 @@ class WXPush(object):
         obj = json.loads(content)
         if obj.has_key("text"):
             alert = obj["text"]
-            WXPush.send_text(app['wx_appid'], app['wx_app_secret'], token, openid, alert)
+            WXPush.send_text(token, openid, alert)
             return True
         elif obj.has_key("audio"):
             alert = u"你收到了一条消息"

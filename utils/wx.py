@@ -1,37 +1,28 @@
 # -*- coding: utf-8 -*-
 import requests
-from redis import Redis
 import pickle
 import time
 import json
 from .helper import request_api, get_redirect_url
-from utils.func import random_ascii_string
 import hashlib
+import socket
+
+try:
+    import socks
+except Exception:
+    pass
+
 
 APIROOT = 'https://api.weixin.qq.com'
 URL = APIROOT + '/cgi-bin'
 
-
-class WX:
-    def __init__(self, app_id='', secret='', token=''):
+#公众号
+class WX(object):
+    def __init__(self, token=''):
         """
         连接微信，获取token
         """
-        self.app_id = app_id
-        self.secret = secret
         self.token = token
-
-    def request_token(self):
-        try:
-            result = request_api(url='/token', params={
-                'grant_type': 'client_credential',
-                'appid': self.app_id,
-                'secret': self.secret
-            }, baseurl=URL)
-
-            return result
-        except Exception as e:
-            return None
         
     def get_token(self, force=False):
         return self.token
@@ -54,38 +45,7 @@ class WX:
             _data = json.dumps(_data, ensure_ascii=False).encode('utf-8')
 
         r = getattr(requests, method)(baseurl + url, headers=headers, params=_params, data=_data, files=files, stream=stream)
-        try:
-            result = r.json()
-
-            errcode = result.get('errcode')
-            # token 过期重新请求，只会重试一次
-            if errcode == 42001 or errcode == 40001:
-                if flag is False:
-                    self.get_token(force=True)
-                    self.request(url=url, method=method, params=params, data=data, files=files, flag=True)
-            else:
-                if errcode > 0:
-                    print '=' * 40
-                    print result
-                    print '=' * 40
-                    return result
-                    # raise ResponseMeta(description=result)
-        except Exception, e:
-            result = r
-        return result
-
-    def add_qrcode(self, chanel):
-        """
-        添加永久二维码，含渠道id
-        """
-        result = self.request(url='/qrcode/create', method='post', data={
-            'action_name': 'QR_LIMIT_SCENE',
-            'action_info': {
-                'scene': {
-                    'scene_str': chanel
-                }
-            }
-        })
+        result = r.json()
         return result
 
     @staticmethod
@@ -125,24 +85,6 @@ class WX:
         """
         result = self.request(url='/menu/delete')
         return result
-
-    def get_openid_by_code(self, code):
-        """
-        根据code获取用户的openid
-        """
-        result = request_api(url='/sns/oauth2/access_token', params={
-            'appid': self.app_id,
-            'secret': self.secret,
-            'code': code,
-            'grant_type': 'authorization_code'
-        }, baseurl=APIROOT)
-        return result
-
-    def get_redirect_url(self, url):
-        """
-        利用oauth跳转，以便于菜单设置url后得到code从而进一步得到用户的openid
-        """
-        return get_redirect_url(self.app_id, url)
 
     def get_users(self, next_openid=''):
         """
@@ -226,3 +168,12 @@ class WX:
             })
         return result
 
+
+class WX2(WX):
+    def send_message(self, data):
+        default_socket = socket.socket
+        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7778)
+        socket.socket = socks.socksocket
+        r = super(WX2, self).send_message(data)
+        socket.socket = default_socket
+        return r
