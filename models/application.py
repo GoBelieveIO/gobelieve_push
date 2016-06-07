@@ -132,7 +132,7 @@ def get_gcm_key(mysql, appid):
 def get_wx(db, appid):
     for i in range(2):
         try:
-            sql = "SELECT wx.gh_id as gh_id, wx.wx_app_id as wx_app_id, wx.refresh_token as refresh_token, wx.store_id as store_id FROM client, client_wx as wx where client.app_id=%s and client.id=wx.client_id"
+            sql = "SELECT wx.gh_id as gh_id, wx.wx_app_id as wx_app_id, wx.refresh_token as refresh_token, app.store_id as store_id FROM app, client, client_wx as wx where app.id=%s and client.id=wx.client_id and app.id=client.app_id"
             r = db.execute(sql, appid)
             obj = r.fetchone()
             return obj
