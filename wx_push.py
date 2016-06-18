@@ -136,7 +136,7 @@ class WXPush(object):
         """
         wx = WX(token)
         if wx:
-            if isinstance(files, str):
+            if isinstance(files, str) or isinstance(files, unicode):
                 res = requests.get(files)
                 content = res.content
             else:
@@ -154,13 +154,13 @@ class WXPush(object):
             return _check_error(result_2)
 
     @staticmethod
-    def send_voice(wx_appid, wx_app_secret, token, openid, files):
+    def send_voice(token, openid, files):
         """
         发送语音
         """
-        wx = WX(wx_appid, wx_app_secret, token)
+        wx = WX(token)
         if wx:
-            if isinstance(files, str):
+            if isinstance(files, str) or isinstance(files, unicode):
                 res = requests.get(files)
                 content = res.content
             else:
@@ -247,11 +247,11 @@ class WXPush(object):
             WXPush.send_text(token, openid, alert)
             return True
         elif obj.has_key("audio"):
-            alert = u"你收到了一条消息"
-            return False
+            WXPush.send_voice(token, openid, obj['audio']['url'])
+            return True
         elif obj.has_key("image"):
-            alert = u"你收到了一张图片"
-            return False
+            WXPush.send_image(token, openid, obj['image'])
+            return True
         else:
             alert = u"你收到了一条消息"
             return False         
