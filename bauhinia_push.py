@@ -141,23 +141,39 @@ def push_message(appid, appname, receiver, content, extra):
 
 def handle_im_message(msg):
     obj = json.loads(msg)
-    if not obj.has_key("appid") or not obj.has_key("sender") or \
-       (not obj.has_key("receiver") and not obj.has_key("receivers")):
+    if not obj.has_key("appid") or \
+       not obj.has_key("sender") or \
+       not obj.has_key("receiver"):
         logging.warning("invalid push msg:%s", msg)
         return
 
     logging.debug("push msg:%s", msg)
+    appid = obj["appid"]
+    sender = obj["sender"]
+    receiver = obj["receiver"]
+        
+    appname = get_title(appid)
+    sender_name = user.get_user_name(rds, appid, sender)
+    content = push_content(sender_name, obj["content"])
+
+    extra = {}
+    extra["sender"] = sender
+    push_message(appid, appname, receiver, content, extra)
+
+
+def handle_group_message(msg):
+    obj = json.loads(msg)
+    if not obj.has_key("appid") or not obj.has_key("sender") or \
+       not obj.has_key("receivers") or not obj.has_key("group_id"):
+        logging.warning("invalid push msg:%s", msg)
+        return
+
+    logging.debug("group push msg:%s", msg)
 
     appid = obj["appid"]
     sender = obj["sender"]
-
-    receivers = []
-    if obj.has_key("receiver"):
-        receivers = [obj["receiver"]]
-    elif obj.has_key("receivers"):
-        receivers = obj["receivers"]
-        
-    group_id = obj["group_id"] if obj.has_key("group_id") else 0
+    receivers = obj["receivers"]
+    group_id = obj["group_id"]
 
     appname = get_title(appid)
     sender_name = user.get_user_name(rds, appid, sender)
@@ -264,12 +280,14 @@ def handle_voip_message(msg):
 
 def receive_offline_message():
     while True:
-        item = rds.blpop(("push_queue", "customer_push_queue", "voip_push_queue"))
+        item = rds.blpop(("push_queue", "group_push_queue", "customer_push_queue", "voip_push_queue"))
         if not item:
             continue
         q, msg = item
         if q == "push_queue":
             handle_im_message(msg)
+        elif q == "group_push_queue":
+            handle_group_message(msg)
         elif q == "customer_push_queue":
             handle_customer_message(msg)
         elif q == "voip_push_queue":
