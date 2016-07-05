@@ -38,6 +38,7 @@ class MiPush:
             'description':content,
             'pass_through':0,
             'notify_type':-1,
+            'extra.notify_effect':1,
         }
         headers = {'Content-Type': 'application/x-www-form-urlencoded',
                    'Authorization': 'key=' + mi_app_secret}
