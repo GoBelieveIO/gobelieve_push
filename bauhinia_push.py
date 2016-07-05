@@ -234,6 +234,7 @@ def handle_customer_message(msg):
             if u.wx_openid:
                 WXPush.push(appid, appname, u.wx_openid, raw_content)
             else:
+                extra['store_id'] = store
                 store = Store.get_store(rds, store)
                 sender_name = store.name
                 content = push_content(sender_name, raw_content)
