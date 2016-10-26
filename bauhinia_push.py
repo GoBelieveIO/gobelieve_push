@@ -2,6 +2,10 @@
 import time
 import logging
 import sys
+
+reload(sys)
+sys.setdefaultencoding("utf-8")
+
 import redis
 import json
 import config
@@ -16,9 +20,12 @@ from huawei import HuaWeiPush
 from gcm import GCMPush
 from mipush import MiPush
 from wx_push import WXPush
+from ali_push import AliPush
 
 from models import application
 from models import user
+
+
 
 MSG_CUSTOMER = 24 #顾客->客服
 MSG_CUSTOMER_SUPPORT = 25 #客服->顾客
@@ -33,7 +40,7 @@ XGPush.mysql = mysql_db
 HuaWeiPush.mysql = mysql_db
 GCMPush.mysql = mysql_db
 MiPush.mysql = mysql_db
-
+AliPush.mysql = mysql_db
 WXPush.mysql = mysql_db
 WXPush.rds = rds
 
@@ -75,7 +82,7 @@ def push_content(sender_name, body):
                 alert = u"你收到了一张图片"
             else:
                 alert = u"你收到了一条消息"
-         
+
         except ValueError:
             alert = u"你收到了一条消息"
 
@@ -91,7 +98,7 @@ def push_content(sender_name, body):
                 alert = "%s%s"%(sender_name, u"发来一张图片")
             else:
                 alert = "%s%s"%(sender_name, u"发来一条消息")
-         
+
         except ValueError:
             alert = "%s%s"%(sender_name, u"发来一条消息")
     return alert
@@ -111,11 +118,12 @@ def xg_push(appid, appname, token, content, extra):
 def push_message_u(appid, appname, u, content, extra):
     receiver = u.uid
     #找出最近绑定的token
-    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp)
+    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
+             u.ali_timestamp)
 
     if u.apns_device_token and u.apns_timestamp == ts:
         sound = 'default'
-        ios_push(appid, u.apns_device_token, content, 
+        ios_push(appid, u.apns_device_token, content,
                  u.unread + 1, sound, extra)
         user.set_user_unread(rds, appid, receiver, u.unread+1)
     elif u.ng_device_token and u.ng_timestamp == ts:
@@ -128,6 +136,8 @@ def push_message_u(appid, appname, u, content, extra):
         HuaWeiPush.push(appid, appname, u.hw_device_token, content)
     elif u.gcm_device_token and u.gcm_timestamp == ts:
         GCMPush.push(appid, appname, u.gcm_device_token, content)
+    elif u.ali_device_token and u.ali_timestamp == ts:
+        AliPush.push(appid, appname, u.ali_device_token, content)
     else:
         logging.info("uid:%d has't device token", receiver)
 
@@ -151,7 +161,7 @@ def handle_im_message(msg):
     appid = obj["appid"]
     sender = obj["sender"]
     receiver = obj["receiver"]
-        
+
     appname = get_title(appid)
     sender_name = user.get_user_name(rds, appid, sender)
     content = push_content(sender_name, obj["content"])
@@ -182,7 +192,7 @@ def handle_group_message(msg):
 
     extra = {}
     extra["sender"] = sender
-    
+
     if group_id:
         extra["group_id"] = group_id
 
@@ -194,7 +204,7 @@ def handle_group_message(msg):
                 continue
 
         push_message(appid, appname, receiver, content, extra)
-    
+
 
 def handle_customer_message(msg):
     obj = json.loads(msg)
@@ -245,7 +255,7 @@ def handle_customer_message(msg):
             content = push_content(sender_name, raw_content)
             push_message(appid, appname, receiver, content, extra)
 
-        
+
 def handle_voip_message(msg):
     obj = json.loads(msg)
     appid = obj["appid"]
@@ -259,7 +269,8 @@ def handle_voip_message(msg):
         logging.info("uid:%d nonexist", receiver)
         return
     #找出最近绑定的token
-    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp)
+    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
+             u.ali_timestamp)
 
     if sender_name:
         sender_name = sender_name.decode("utf8")
@@ -275,6 +286,8 @@ def handle_voip_message(msg):
         MiPush.push_message(appid, u.mi_device_token, content)
     elif u.hw_device_token and u.hw_timestamp == ts:
         HuaWeiPush.push_message(appid, u.hw_device_token, content)
+    elif u.ali_device_token and u.ali_timestamp == ts:
+        AliPush.push_message(appid, appname, u.hw_device_token, content)
     else:
         logging.info("uid:%d has't device token", receiver)
 
@@ -295,7 +308,7 @@ def receive_offline_message():
             handle_voip_message(msg)
         else:
             logging.warning("unknown queue:%s", q)
-        
+
 
 def main():
     logging.debug("startup")

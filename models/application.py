@@ -1,8 +1,8 @@
-
 # -*- coding: utf-8 -*-
 import logging
 import sys
 import traceback
+
 
 def get_app_name(mysql, appid):
     for i in range(2):
@@ -15,6 +15,7 @@ def get_app_name(mysql, appid):
             logging.info("exception:%s", str(e))
             continue
     return ""
+
 
 def get_p12(mysql, sandbox, appid):
     for i in range(2):
@@ -40,6 +41,7 @@ def get_p12(mysql, sandbox, appid):
             continue
 
     return None, None, None
+
 
 def get_certificate(mysql, appid):
     for i in range(2):
@@ -92,8 +94,6 @@ def get_mi_key(mysql, appid):
     return None, None
 
 
-
-
 def get_hw_key(mysql, appid):
     for i in range(2):
         try:
@@ -109,7 +109,6 @@ def get_hw_key(mysql, appid):
             continue
 
     return None, None
-
 
 
 def get_gcm_key(mysql, appid):
@@ -128,7 +127,8 @@ def get_gcm_key(mysql, appid):
 
     return None, None
 
-#获取微信公众号id
+
+# 获取微信公众号id
 def get_wx(db, appid):
     for i in range(2):
         try:
@@ -141,3 +141,19 @@ def get_wx(db, appid):
             continue
 
     return None
+
+
+def get_ali_key(mysql, appid):
+    for i in range(2):
+        try:
+            sql = '''select cc.ali_access_key_id, cc.ali_access_secret, cc.ali_app_key
+                      from client as c, client_certificate as cc where c.app_id=%s and c.id=cc.client_id'''
+            cursor = mysql.execute(sql, appid)
+            obj = cursor.fetchone()
+            if obj:
+                return obj['ali_access_key_id'], obj['ali_access_secret'], obj['ali_app_key']
+        except Exception, e:
+            logging.info("exception:%s", str(e))
+            continue
+
+    return None, None, None
