@@ -31,7 +31,8 @@ MSG_CUSTOMER = 24 #顾客->客服
 MSG_CUSTOMER_SUPPORT = 25 #客服->顾客
 
 
-rds = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, db=config.REDIS_DB)
+rds = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, 
+                        db=config.REDIS_DB, password=config.REDIS_PASSWORD)
 mysql_db = mysql.Mysql.instance(*config.MYSQL)
 
 IOSPush.mysql = mysql_db
@@ -105,7 +106,8 @@ def push_content(sender_name, body):
 
 def ios_push(appid, token, content, badge, sound, extra):
     alert = content
-    IOSPush.push(appid, token, alert, sound, badge, extra)
+    content_available = 0
+    IOSPush.push(appid, token, alert, sound, badge, content_available, extra)
 
 def android_push(appid, appname, token, content, extra):
     token = binascii.a2b_hex(token)
@@ -113,6 +115,41 @@ def android_push(appid, appname, token, content, extra):
 
 def xg_push(appid, appname, token, content, extra):
     XGPush.push(appid, appname, token, content, extra)
+
+
+
+def push_customer_support_message(appid, appname, u, content, extra):
+    receiver = u.uid
+    #找出最近绑定的token
+    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, 
+             u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
+             u.ali_timestamp)
+
+    if u.apns_device_token and u.apns_timestamp == ts:
+        sound = 'default'
+        alert = content
+        badge = u.unread + 1
+        content_available = 1
+        IOSPush.push(appid, u.apns_device_token, alert, 
+                     sound, badge, content_available, extra)
+        user.set_user_unread(rds, appid, receiver, u.unread+1)
+    elif u.ng_device_token and u.ng_timestamp == ts:
+        android_push(appid, appname, u.ng_device_token, content, extra)
+    elif u.xg_device_token and u.xg_timestamp == ts:
+        xg_push(appid, appname, u.xg_device_token, content, extra)
+    elif u.mi_device_token and u.mi_timestamp == ts:
+        MiPush.push(appid, appname, u.mi_device_token, content)
+    elif u.hw_device_token and u.hw_timestamp == ts:
+        HuaWeiPush.push(appid, appname, u.hw_device_token, content)
+    elif u.gcm_device_token and u.gcm_timestamp == ts:
+        GCMPush.push(appid, appname, u.gcm_device_token, content)
+    elif u.ali_device_token and u.ali_timestamp == ts:
+        AliPush.push(appid, appname, u.ali_device_token, content)
+        #通过透传消息通知app有新消息到达
+        content = json.dumps({"xiaowei":{"new":1}})
+        AliPush.push_message(appid, appname, u.ali_device_token, content)
+    else:
+        logging.info("uid:%d has't device token", receiver)
 
 
 def push_message_u(appid, appname, u, content, extra):
@@ -234,7 +271,7 @@ def handle_customer_message(msg):
         content = push_content(sender_name, raw_content)
         push_message(appid, appname, receiver, content, extra)
     elif command == MSG_CUSTOMER_SUPPORT:
-        if appid == customer_appid:
+        if appid == customer_appid and receiver == customer:
             #客服发给顾客
             u = user.get_user(rds, appid, receiver)
             if u is None:
@@ -245,10 +282,11 @@ def handle_customer_message(msg):
                 WXPush.push(appid, appname, u.wx_openid, raw_content)
             else:
                 extra['store_id'] = store
+                extra['xiaowei'] = {"new":1}
                 store = Store.get_store(rds, store)
                 sender_name = store.name
                 content = push_content(sender_name, raw_content)
-                push_message_u(appid, appname, u, content, extra)
+                push_customer_support_message(appid, appname, u, content, extra)
         else:
             #群发到其它客服人员
             sender_name = user.get_user_name(rds, appid, seller)

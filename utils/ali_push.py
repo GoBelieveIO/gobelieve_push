@@ -178,10 +178,13 @@ class Push(object):
         result = self.client.do_action(request)
         if result:
             res = xmltodict.parse(result)
+            LOGGER.debug("ali send result:%s", res)
             if res and res.get('PushResponse', {}).get('ResponseId'):
+                LOGGER.debug("ali send success")
                 return True
             else:
                 print result
+        LOGGER.debug("ali send failure")
         return False
 
     @classmethod

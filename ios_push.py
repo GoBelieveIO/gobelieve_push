@@ -94,8 +94,9 @@ class IOSPush(object):
         return apns
 
     @classmethod
-    def push(cls, appid, token, alert, sound="default", badge=0, extra=None):
-        message = Message([token], alert=alert, badge=badge, sound=sound, extra=extra)
+    def push(cls, appid, token, alert, sound="default", badge=0, content_available=0, extra=None):
+        message = Message([token], alert=alert, badge=badge, sound=sound, 
+                          content_available=content_available, extra=extra)
 
         for i in range(3):
             if i > 0:
@@ -166,20 +167,23 @@ if __name__ == "__main__":
     f = open("imdemo_dev.p12", "rb")
     p12 = f.read()
     f.close()
-
-    token = "177bbe6da89125b84bfad60ff3d729005792fad4ebbbf5729a8cecc79365a218"
+    token = "86ac9703925375de83f0023b82f245371a9b58437bd9df441018558c99657b75"
     alert = "测试ios推送"
-    badge = 0
+    badge = 1
     sound = "default"
     #alert = None
     #badge = None
     #sound = None
+    print len(p12)
 
-    extra = {"test":1, "test2":2}
+    extra = {"xiaowei":{"new":1}}
     apns = IOSPush.connect_apns_server(True, p12, "", 0)
-    message = Message([token], alert=alert, badge=badge, 
-                      sound=sound, extra=extra)
+    #message = Message([token], alert=alert, badge=badge, 
+    #sound=sound, extra=extra)
+
+    message = Message([token], content_available=1, extra=extra)
+
     result = apns.send(message)
     print result
-    
+    time.sleep(1)
 
