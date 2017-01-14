@@ -330,9 +330,49 @@ def handle_voip_message(msg):
         logging.info("uid:%d has't device token", receiver)
 
 
+
+def handle_system_message(msg):
+    obj = json.loads(msg)
+    appid = obj["appid"]
+    receiver = obj["receiver"]
+    
+    appname = get_title(appid)
+    try:
+        content_obj = json.loads(obj.get('content'))
+        content = content_obj.get('push')
+        if not content:
+            return
+        sound = content_obj.get('sound', 'default')
+    except Exception, e:
+        logging.info("exception:%s", e)
+        return
+    
+    u = user.get_user(rds, appid, receiver)
+    if u is None:
+        logging.info("uid:%d nonexist", receiver)
+        return
+    #找出最近绑定的token
+    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp,
+             u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
+             u.ali_timestamp)
+
+    if u.apns_device_token and u.apns_timestamp == ts:
+        ios_push(appid, u.apns_device_token, content,
+                 u.unread + 1, sound, {})
+        user.set_user_unread(rds, appid, receiver, u.unread+1)
+    elif u.mi_device_token and u.mi_timestamp == ts:
+        MiPush.push_message(appid, u.mi_device_token, content)
+    elif u.hw_device_token and u.hw_timestamp == ts:
+        HuaWeiPush.push_message(appid, u.hw_device_token, content)
+    elif u.ali_device_token and u.ali_timestamp == ts:
+        AliPush.push_message(appid, appname, u.hw_device_token, content)
+    else:
+        logging.info("uid:%d has't device token", receiver)
+        
+
 def receive_offline_message():
     while True:
-        item = rds.blpop(("push_queue", "group_push_queue", "customer_push_queue", "voip_push_queue"))
+        item = rds.blpop(("push_queue", "group_push_queue", "customer_push_queue", "voip_push_queue", "system_push_queue"))
         if not item:
             continue
         q, msg = item
@@ -344,6 +384,8 @@ def receive_offline_message():
             handle_customer_message(msg)
         elif q == "voip_push_queue":
             handle_voip_message(msg)
+        elif q == "system_push_queue":
+            handle_system_message(msg)
         else:
             logging.warning("unknown queue:%s", q)
 
