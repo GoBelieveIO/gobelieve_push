@@ -40,3 +40,7 @@ SOCKS5_PROXY = 'socks5://127.0.0.1:7778'
 #平台appsecret
 WX_APPID = "wx8ec7ea1fab1fbbf2"
 WX_APPSECRET = "a27fb4d3ee36978b5288df1843a29c88"
+
+
+KEFU_APPID = 1453
+IM_RPC_URL = "http://192.168.33.1:6666"

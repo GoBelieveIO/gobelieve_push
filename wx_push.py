@@ -135,23 +135,22 @@ class WXPush(object):
         发送图片
         """
         wx = WX(token)
-        if wx:
-            if isinstance(files, str) or isinstance(files, unicode):
-                res = requests.get(files)
-                content = res.content
-            else:
-                media = files['media']
-                content = media.stream
-            filename = random_ascii_string(10) + '.jpg'
-            result_1 = wx.add_media('image', [
-                ('image', (filename, content, 'image/jpeg'))
-            ])
-            result_1 = _check_error(result_1)
-            media_id = result_1.get('media_id')
-            result_2 = wx.send_common_message(openid, msgtype='image', content={
-                'media_id': media_id
-            })
-            return _check_error(result_2)
+        if isinstance(files, str) or isinstance(files, unicode):
+            res = requests.get(files)
+            content = res.content
+        else:
+            media = files['media']
+            content = media.stream
+        filename = random_ascii_string(10) + '.jpg'
+        result_1 = wx.add_media('image', [
+            ('image', (filename, content, 'image/jpeg'))
+        ])
+        result_1 = _check_error(result_1)
+        media_id = result_1.get('media_id')
+        result_2 = wx.send_common_message(openid, msgtype='image', content={
+            'media_id': media_id
+        })
+        return _check_error(result_2)
 
     @staticmethod
     def send_voice(token, openid, files):
@@ -159,23 +158,22 @@ class WXPush(object):
         发送语音
         """
         wx = WX(token)
-        if wx:
-            if isinstance(files, str) or isinstance(files, unicode):
-                res = requests.get(files)
-                content = res.content
-            else:
-                media = files['media']
-                content = media.stream
-            filename = random_ascii_string(10) + '.amr'
-            result_1 = wx.add_media('voice', [
-                ('voice', (filename, content, 'audio/amr'))
-            ])
-            result_1 = _check_error(result_1)
-            media_id = result_1.get('media_id')
-            result_2 = wx.send_common_message(openid, msgtype='voice', content={
-                'media_id': media_id
-            })
-            return _check_error(result_2)
+        if isinstance(files, str) or isinstance(files, unicode):
+            res = requests.get(files)
+            content = res.content
+        else:
+            media = files['media']
+            content = media.stream
+        filename = random_ascii_string(10) + '.amr'
+        result_1 = wx.add_media('voice', [
+            ('voice', (filename, content, 'audio/amr'))
+        ])
+        result_1 = _check_error(result_1)
+        media_id = result_1.get('media_id')
+        result_2 = wx.send_common_message(openid, msgtype='voice', content={
+            'media_id': media_id
+        })
+        return _check_error(result_2)
 
     @staticmethod
     def send_article(wx_appid, wx_app_secret, token, openid, articles):
@@ -183,16 +181,16 @@ class WXPush(object):
         向用户发送文章
         """
         wx = WX(wx_appid, wx_app_secret, token)
-        if wx:
-            for article in articles:
-                if not article.get('title'):
-                    article['title'] = ''
-                if not article.get('description'):
-                    article['description'] = ''
-            result = wx.send_common_message(openid, msgtype='news', content={
-                'articles': articles
-            })
-            return _check_error(result)
+
+        for article in articles:
+            if not article.get('title'):
+                article['title'] = ''
+            if not article.get('description'):
+                article['description'] = ''
+        result = wx.send_common_message(openid, msgtype='news', content={
+            'articles': articles
+        })
+        return _check_error(result)
 
     @staticmethod
     def send_template(wx_appid, wx_app_secret, token, template_id, openid, title, text):
@@ -244,14 +242,11 @@ class WXPush(object):
         obj = json.loads(content)
         if obj.has_key("text"):
             alert = obj["text"]
-            WXPush.send_text(token, openid, alert)
-            return True
+            return WXPush.send_text(token, openid, alert)
         elif obj.has_key("audio"):
-            WXPush.send_voice(token, openid, obj['audio']['url'])
-            return True
+            return WXPush.send_voice(token, openid, obj['audio']['url'])
         elif obj.has_key("image"):
-            WXPush.send_image(token, openid, obj['image'])
-            return True
+            return WXPush.send_image(token, openid, obj['image'])
         else:
             alert = u"你收到了一条消息"
             return False         

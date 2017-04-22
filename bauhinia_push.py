@@ -11,6 +11,8 @@ import json
 import config
 import traceback
 import binascii
+import requests
+from urllib import urlencode
 
 from utils import mysql
 from ios_push import IOSPush
@@ -116,8 +118,19 @@ def android_push(appid, appname, token, content, extra):
 def xg_push(appid, appname, token, content, extra):
     XGPush.push(appid, appname, token, content, extra)
 
+#发送系统消息的rpc接口
+def post_system_message(appid, uid, content):
+    params = {
+        "appid":appid,
+        "uid":uid
+    }
+    im_url=config.IM_RPC_URL
+    url = im_url + "/post_system_message?" + urlencode(params)
+    headers = {"Content-Type":"text/plain; charset=UTF-8"}
+    resp = requests.post(url, data=content.encode("utf8"), headers=headers)
+    logging.debug("post system message:%s", resp.status_code == 200)
 
-
+    
 def push_customer_support_message(appid, appname, u, content, extra):
     receiver = u.uid
     #找出最近绑定的token
@@ -279,7 +292,21 @@ def handle_customer_message(msg):
                 return
 
             if u.wx_openid:
-                WXPush.push(appid, appname, u.wx_openid, raw_content)
+                result = WXPush.push(appid, appname, u.wx_openid, raw_content)
+                #errcode=45015,
+                #errmsg=response out of time limit or subscription is canceled
+                if result and result.get('errcode') == 45015:
+                    now = int(time.time())
+                    content_obj = {
+                        "wechat": {
+                            "customer_appid":customer_appid,
+                            "customer_id":customer,
+                            "timestamp":now,
+                            "notification":"微信会话超时"
+                        }
+                    }
+                    post_system_message(config.KEFU_APPID, seller,
+                                        json.dumps(content_obj))
             else:
                 extra['store_id'] = store
                 extra['xiaowei'] = {"new":1}
