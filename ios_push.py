@@ -72,6 +72,11 @@ class IOSPush(object):
         pub_key = crypto.dump_certificate(crypto.FILETYPE_PEM, p12.get_certificate())
         return  pub_key, priv_key
 
+    @staticmethod
+    def check_p12_expired(p12, secret):
+        p12 = crypto.load_pkcs12(p12, str(secret))
+        return p12.get_certificate().has_expired()
+
     @classmethod 
     def connect_apns_server(cls, sandbox, p12, secret, timestamp):
         pub_key, priv_key = cls.gen_pem(p12, secret)
@@ -89,7 +94,9 @@ class IOSPush(object):
             if not p12:
                 logging.warn("get p12 fail client id:%s", appid)
                 return None
-            
+            if not cls.check_p12_expired(p12, secret):
+                logging.warn("p12 expiry client id:%s", appid)
+                return None
             apns = cls.connect_apns_server(sandbox, p12, secret, timestamp)
             cls.apns_manager.set_apns_connection(appid, apns)
         return apns
