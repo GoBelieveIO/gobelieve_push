@@ -14,6 +14,7 @@ import threading
 from models import application
 import config
 import time
+import OpenSSL
 
 sandbox = config.SANDBOX
 
@@ -123,7 +124,12 @@ class IOSPush(object):
                     continue
                 else:
                     break
-            
+            except OpenSSL.SSL.Error, e:
+                logging.warn("ssl exception:", str(e))
+                cls.apns_manager.remove_apns_connection(appid)
+                err = e.message[0][2]
+                if "certificate expired" in err:
+                    break
             except Exception, e:
                 logging.warn("send notification exception:%s", str(e))
                 cls.apns_manager.remove_apns_connection(appid)
@@ -182,8 +188,14 @@ if __name__ == "__main__":
     #sound=sound, extra=extra)
 
     message = Message([token], content_available=1, extra=extra)
-
-    result = apns.send(message)
-    print result
-    time.sleep(1)
+    try:
+        result = apns.send(message)
+        print result
+        time.sleep(1)
+    except OpenSSL.SSL.Error, e:
+        err = e.message[0][2]
+        print "certificate expired" in err
+        print "ssl exception:", e, type(e), dir(e), e.args, e.message
+    except Exception, e:
+        print "exception:", e, type(e), dir(e), e.args, e.message
 
