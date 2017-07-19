@@ -94,7 +94,7 @@ class IOSPush(object):
             if not p12:
                 logging.warn("get p12 fail client id:%s", appid)
                 return None
-            if not cls.check_p12_expired(p12, secret):
+            if cls.check_p12_expired(p12, secret):
                 logging.warn("p12 expiry client id:%s", appid)
                 return None
             apns = cls.connect_apns_server(sandbox, p12, secret, timestamp)
