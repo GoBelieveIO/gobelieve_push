@@ -125,7 +125,7 @@ class IOSPush(object):
                 else:
                     break
             except OpenSSL.SSL.Error, e:
-                logging.warn("ssl exception:", str(e))
+                logging.warn("ssl exception:%s", str(e))
                 cls.apns_manager.remove_apns_connection(appid)
                 err = e.message[0][2]
                 if "certificate expired" in err:
