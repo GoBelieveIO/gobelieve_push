@@ -130,7 +130,7 @@ class WXAPI2(WXAPI):
     #获取第三方平台component_access_token
     def request_token(self, ticket):
         default_socket = socket.socket
-        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7778)
+        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 1080)
         socket.socket = socks.socksocket
         r = super(WXAPI2, self).request_token(ticket)
         socket.socket = default_socket
@@ -139,7 +139,7 @@ class WXAPI2(WXAPI):
     #获取预授权码pre_auth_code
     def request_pre_auth_code(self):
         default_socket = socket.socket
-        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7778)
+        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 1080)
         socket.socket = socks.socksocket
         r = super(WXAPI2, self).request_pre_auth_code()
         socket.socket = default_socket
@@ -148,7 +148,7 @@ class WXAPI2(WXAPI):
     #使用授权码换取公众号的接口调用凭据和授权信息
     def request_auth(self, authorization_code):
         default_socket = socket.socket
-        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7778)
+        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 1080)
         socket.socket = socks.socksocket
         r = super(WXAPI2, self).request_auth(authorization_code)
         socket.socket = default_socket
@@ -157,7 +157,7 @@ class WXAPI2(WXAPI):
     #获取（刷新）授权公众号的接口调用凭据（令牌）
     def refresh_auth(self, auth_appid, refresh_token):
         default_socket = socket.socket
-        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7778)
+        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 1080)
         socket.socket = socks.socksocket
         r = super(WXAPI2, self).refresh_auth(auth_appid, refresh_token)
         socket.socket = default_socket
@@ -167,7 +167,7 @@ class WXAPI2(WXAPI):
     #appid 公众号appid
     def request_info(self, appid):
         default_socket = socket.socket
-        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7778)
+        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 1080)
         socket.socket = socks.socksocket
         r = super(WXAPI2, self).request_info(appid)
         socket.socket = default_socket

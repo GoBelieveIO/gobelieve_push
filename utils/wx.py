@@ -172,7 +172,7 @@ class WX(object):
 class WX2(WX):
     def send_message(self, data):
         default_socket = socket.socket
-        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7778)
+        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 1080)
         socket.socket = socks.socksocket
         r = super(WX2, self).send_message(data)
         socket.socket = default_socket
@@ -180,7 +180,7 @@ class WX2(WX):
 
     def add_media(self, media_type, media):
         default_socket = socket.socket
-        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7778)
+        socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 1080)
         socket.socket = socks.socksocket
         r = super(WX2, self).add_media(media_type, media)
         socket.socket = default_socket
