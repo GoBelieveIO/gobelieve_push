@@ -253,6 +253,7 @@ class IOSPush(object):
                     continue
                 logging.info("update app:%s p12", appid)
                 cls.apns_manager.remove_apns_connection(appid)
+                cls.apns_manager.remove_pushkit_connection(appid)
 
     @classmethod
     def update_p12_thread(cls):

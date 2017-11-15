@@ -382,7 +382,7 @@ def handle_system_message(msg):
     if u is None:
         logging.info("uid:%d nonexist", receiver)
         return
-    print "xxxxxxxx:", voip_content
+
     #找出最近绑定的token
     ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp,
              u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
