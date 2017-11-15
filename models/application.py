@@ -42,6 +42,25 @@ def get_p12(mysql, sandbox, appid):
 
     return None, None, None
 
+def get_pushkit_p12(mysql, appid):
+    for i in range(2):
+        try:
+            sql = '''select push_key, push_key_secret, push_key_utime
+                      from client_apns, client where client.app_id=%s and client.id=client_apns.client_id'''
+            cursor = mysql.execute(sql, appid)
+            obj = cursor.fetchone()
+        
+            p12 = obj["push_key"]
+            secret = obj["push_key_secret"]
+            timestamp = obj["push_key_utime"]
+
+            return p12, secret, timestamp
+        except Exception, e:
+            traceback.print_exc(file=sys.stdout)
+            logging.info("exception:%s", str(e))
+            continue
+
+    return None, None, None
 
 def get_certificate(mysql, appid):
     for i in range(2):

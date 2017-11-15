@@ -111,6 +111,9 @@ def ios_push(appid, token, content, badge, sound, extra):
     content_available = 0
     IOSPush.push(appid, token, alert, sound, badge, content_available, extra)
 
+def ios_voip_push(appid, token, extra):
+    IOSPush.voip_push(appid, token, extra)
+    
 def android_push(appid, appname, token, content, extra):
     token = binascii.a2b_hex(token)
     SmartPush.push(appid, appname, token, content, extra)
@@ -366,8 +369,9 @@ def handle_system_message(msg):
     appname = get_title(appid)
     try:
         content_obj = json.loads(obj.get('content'))
+        voip_content = content_obj.get('voip_push')
         content = content_obj.get('push')
-        if not content:
+        if not voip_content and not content:
             return
         sound = content_obj.get('sound', 'default')
     except Exception, e:
@@ -378,16 +382,25 @@ def handle_system_message(msg):
     if u is None:
         logging.info("uid:%d nonexist", receiver)
         return
+    print "xxxxxxxx:", voip_content
     #找出最近绑定的token
     ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp,
              u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
              u.ali_timestamp)
 
     if u.apns_device_token and u.apns_timestamp == ts:
-        ios_push(appid, u.apns_device_token, content,
-                 u.unread + 1, sound, {})
-        user.set_user_unread(rds, appid, receiver, u.unread+1)
-    elif u.mi_device_token and u.mi_timestamp == ts:
+        if voip_content and u.pushkit_device_token:
+            ios_voip_push(appid, u.pushkit_device_token, voip_content)
+        elif content:
+            ios_push(appid, u.apns_device_token, content,
+                     u.unread + 1, sound, {})
+            user.set_user_unread(rds, appid, receiver, u.unread+1)
+        return
+    
+    if not content:
+        return
+    
+    if u.mi_device_token and u.mi_timestamp == ts:
         MiPush.push_message(appid, u.mi_device_token, content)
     elif u.hw_device_token and u.hw_timestamp == ts:
         HuaWeiPush.push_message(appid, u.hw_device_token, content)
@@ -399,10 +412,12 @@ def handle_system_message(msg):
 
 def receive_offline_message():
     while True:
-        item = rds.blpop(("push_queue", "group_push_queue", "customer_push_queue", "voip_push_queue", "system_push_queue"))
+        item = rds.blpop(("push_queue", "group_push_queue", "customer_push_queue",
+                          "voip_push_queue", "system_push_queue"))
         if not item:
             continue
         q, msg = item
+        logging.debug("queue:%s message:%s", q, msg)
         if q == "push_queue":
             handle_im_message(msg)
         elif q == "group_push_queue":
