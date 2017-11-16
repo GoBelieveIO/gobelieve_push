@@ -10,7 +10,7 @@ class User:
 def get_user(rds, appid, uid):
     u = User()
     key = "users_%s_%s"%(appid, uid)
-    u.name, unread,
+    u.name, unread,\
     u.apns_device_token, apns_ts,\
     u.ng_device_token, ng_ts,\
     u.xg_device_token, xg_ts,\
