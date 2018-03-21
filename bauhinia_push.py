@@ -412,8 +412,10 @@ def handle_system_message(msg):
 
 def receive_offline_message():
     while True:
-        item = rds.blpop(("push_queue", "group_push_queue", "customer_push_queue",
-                          "voip_push_queue", "system_push_queue"))
+        logging.debug("waiting...")
+        item = rds.blpop(("push_queue", "group_push_queue",
+                          "customer_push_queue", "voip_push_queue",
+                          "system_push_queue"))
         if not item:
             continue
         q, msg = item
