@@ -1,2 +1,4 @@
-aliyun-python-sdk-push
+aliyun-python-sdk-push=2.2.4
 xmltodict
+git+git://github.com/lostdragon/apns-client.git
+requesocks
