@@ -59,4 +59,7 @@ def get_user_notification_setting(rds, appid, uid, group_id):
     quiet = int(quiet) if quiet else 0
     return quiet
 
-
+def get_user_do_not_disturb(rds, appid, uid, peer_uid):
+    key = "users_%s_%s"%(appid, uid)
+    q = rds.hget(key, "peer_%d"%peer_uid)
+    return int(q) if q else 0

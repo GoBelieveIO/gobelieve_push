@@ -221,7 +221,12 @@ def handle_im_message(msg):
 
     extra = {}
     extra["sender"] = sender
-    push_message(appid, appname, receiver, content, extra)
+
+    do_not_disturb = user.get_user_do_not_disturb(rds, appid, receiver, sender)
+    if not do_not_disturb:
+        push_message(appid, appname, receiver, content, extra)
+    else:
+        logging.debug("uid:%s set do not disturb :%s", receiver, sender)
 
 
 def handle_group_message(msg):
