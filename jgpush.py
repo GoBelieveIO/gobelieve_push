@@ -5,6 +5,7 @@ import logging
 import time
 import base64
 import config
+from models import application
 
 #文档地址:http://docs.jpush.io/server/rest_api_v3_push/
 JG_URL = "https://api.jpush.cn/v3/push"
@@ -71,7 +72,7 @@ class JGPush:
         jg_app_key = app["jg_app_key"]
         jg_app_secret = app["jg_app_secret"]
         logging.debug("send jg push:%s", content)
-        cls.send(jg_app_key, jg_app_secret, token, appname, content)
+        cls.send(jg_app_key, jg_app_secret, [token], appname, content)
 
         
     @classmethod
