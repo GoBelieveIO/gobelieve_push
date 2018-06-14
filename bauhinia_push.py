@@ -202,6 +202,7 @@ def push_message(appid, appname, receiver, content, extra):
 
     push_message_u(appid, appname, u, content, extra)
 
+    
 def handle_im_message(msg):
     obj = json.loads(msg)
     if not obj.has_key("appid") or \
@@ -247,19 +248,26 @@ def handle_group_message(msg):
     sender_name = user.get_user_name(rds, appid, sender)
 
     content = push_content(sender_name, obj["content"])
-
+    
+    try:
+        c = json.loads(obj["content"])
+        at = c.get('at', [])
+        if receiver in at and sender_name:
+            content = "%s在群聊中@了你"%sender_name
+    except ValueError:
+        at = []
+        
     extra = {}
     extra["sender"] = sender
-
-    if group_id:
-        extra["group_id"] = group_id
+    extra["group_id"] = group_id
 
     for receiver in receivers:
-        if group_id:
-            quiet = user.get_user_notification_setting(rds, appid, receiver, group_id)
-            if quiet:
-                logging.info("uid:%d group id:%d is in quiet mode", receiver, group_id)
-                continue
+        quiet = user.get_user_notification_setting(rds, appid, receiver, group_id)
+        if quiet:
+            logging.info("uid:%d group id:%d do not disturb", receiver, group_id)
+
+        if quiet and receiver not in at:
+            continue
 
         push_message(appid, appname, receiver, content, extra)
 
