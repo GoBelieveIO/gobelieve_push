@@ -252,8 +252,6 @@ def handle_group_message(msg):
     try:
         c = json.loads(obj["content"])
         at = c.get('at', [])
-        if receiver in at and sender_name:
-            content = "%s在群聊中@了你"%sender_name
     except ValueError:
         at = []
         
@@ -269,6 +267,9 @@ def handle_group_message(msg):
         if quiet and receiver not in at:
             continue
 
+        if receiver in at and sender_name:
+            content = "%s在群聊中@了你"%sender_name
+        
         push_message(appid, appname, receiver, content, extra)
 
 
