@@ -23,7 +23,7 @@ from gcm import GCMPush
 from mipush import MiPush
 from wx_push import WXPush
 from ali_push import AliPush
-
+from jgpush import JGPush
 from models import application
 from models import user
 
@@ -44,6 +44,7 @@ HuaWeiPush.mysql = mysql_db
 GCMPush.mysql = mysql_db
 MiPush.mysql = mysql_db
 AliPush.mysql = mysql_db
+JGPush.mysql = mysql_db
 WXPush.mysql = mysql_db
 WXPush.rds = rds
 
@@ -139,7 +140,7 @@ def push_customer_support_message(appid, appname, u, content, extra):
     #找出最近绑定的token
     ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, 
              u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
-             u.ali_timestamp)
+             u.ali_timestamp, u.jp_timestamp)
 
     if u.apns_device_token and u.apns_timestamp == ts:
         sound = 'default'
@@ -164,6 +165,8 @@ def push_customer_support_message(appid, appname, u, content, extra):
         #通过透传消息通知app有新消息到达
         content = json.dumps({"xiaowei":{"new":1}})
         AliPush.push_message(appid, appname, u.ali_device_token, content)
+    elif u.jp_device_token and u.jp_timestamp == ts:
+        JGPush.push(appid, appname, u.jp_device_token, content)
     else:
         logging.info("uid:%d has't device token", receiver)
 
@@ -171,8 +174,9 @@ def push_customer_support_message(appid, appname, u, content, extra):
 def push_message_u(appid, appname, u, content, extra):
     receiver = u.uid
     #找出最近绑定的token
-    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
-             u.ali_timestamp)
+    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp,
+             u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
+             u.ali_timestamp, u.jp_timestamp)
 
     if u.apns_device_token and u.apns_timestamp == ts:
         sound = 'default'
@@ -191,6 +195,8 @@ def push_message_u(appid, appname, u, content, extra):
         GCMPush.push(appid, appname, u.gcm_device_token, content)
     elif u.ali_device_token and u.ali_timestamp == ts:
         AliPush.push(appid, appname, u.ali_device_token, content)
+    elif u.jp_device_token and u.jp_timestamp == ts:
+        JGPush.push(appid, appname, u.jp_device_token, content)
     else:
         logging.info("uid:%d has't device token", receiver)
 

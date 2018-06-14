@@ -18,6 +18,7 @@ def get_user(rds, appid, uid):
     u.hw_device_token, hw_ts,\
     u.gcm_device_token, gcm_ts,\
     u.ali_device_token, ali_ts,\
+    u.jp_device_token, jp_ts,\
     u.pushkit_device_token, pushkit_ts,\
     u.wx_openid, wx_ts = \
         rds.hmget(key, "name", "unread",
@@ -28,6 +29,7 @@ def get_user(rds, appid, uid):
                   "hw_device_token", "hw_timestamp",
                   "gcm_device_token", "gcm_timestamp",
                   "ali_device_token", "ali_timestamp",
+                  "jp_device_token", "jp_timestamp",
                   "pushkit_device_token", "pushkit_timestamp",
                   "wx_openid", "wx_timestamp")
 
@@ -41,6 +43,7 @@ def get_user(rds, appid, uid):
     u.hw_timestamp = int(hw_ts) if hw_ts else 0
     u.gcm_timestamp = int(gcm_ts) if gcm_ts else 0
     u.ali_timestamp = int(ali_ts) if ali_ts else 0
+    u.jp_timestamp = int(jp_ts) if jp_ts else 0
     u.pushkit_timestamp = int(pushkit_ts) if pushkit_ts else 0
     u.wx_timestamp = int(wx_ts) if wx_ts else 0    
     return u

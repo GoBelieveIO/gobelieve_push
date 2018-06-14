@@ -146,6 +146,9 @@ def get_gcm_key(mysql, appid):
 
     return None, None
 
+#todo add jg_app_key, jg_app_secret
+def get_jg_key(mysql, appid):
+    return None, None
 
 # 获取微信公众号id
 def get_wx(db, appid):
