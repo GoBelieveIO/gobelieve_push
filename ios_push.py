@@ -160,10 +160,11 @@ class IOSPush(object):
             logging.warn("appid:%s no bundle id", appid)
             return
 
+        voip_topic = topic + ".voip"
         payload = Payload(custom=extra)
         client = cls.get_pushkit_connection(appid)
         try:
-            client.send_notification(token, payload, topic)
+            client.send_notification(token, payload, voip_topic)
             logging.debug("send voip notification:%s %s %s success", token)
         except OpenSSL.SSL.Error, e:
             logging.warn("ssl exception:%s", str(e))
