@@ -1,20 +1,17 @@
 # -*- coding: utf-8 -*-
-import time
 import logging
-import sys
 import redis
-from apnsclient import Message, APNs, Session
-import json
-import uuid
-import subprocess
 from OpenSSL import crypto
 import os
-import traceback
 import threading
 from models import application
 import config
 import time
+import tempfile
 import OpenSSL
+from apns2.client import APNsClient
+from apns2.payload import Payload
+
 
 sandbox = config.SANDBOX
 
@@ -70,7 +67,7 @@ class APNSConnectionManager:
             if apns:
                 ts = self.connection_timestamps[appid]
                 now = int(time.time())
-                # > 10minute
+                # > 20minute
                 if (now - ts) > 20*60:
                     apns = None
                 else:
@@ -101,13 +98,14 @@ class APNSConnectionManager:
 class IOSPush(object):
     mysql = None
     apns_manager = APNSConnectionManager()
+    bundle_ids = {}
 
     @staticmethod
     def gen_pem(p12, secret):
         p12 = crypto.load_pkcs12(p12, str(secret))
         priv_key = crypto.dump_privatekey(crypto.FILETYPE_PEM, p12.get_privatekey())
         pub_key = crypto.dump_certificate(crypto.FILETYPE_PEM, p12.get_certificate())
-        return  pub_key, priv_key
+        return pub_key, priv_key
 
     @staticmethod
     def check_p12_expired(p12, secret):
@@ -115,13 +113,17 @@ class IOSPush(object):
         return p12.get_certificate().has_expired()
 
     @classmethod 
-    def connect_apns_server(cls, sandbox, p12, secret, timestamp):
+    def connect_apns_server(cls, sandbox, p12, secret):
         pub_key, priv_key = cls.gen_pem(p12, secret)
-        session = Session(read_tail_timeout=1)
-        address = 'push_sandbox' if sandbox else 'push_production'
-        conn = session.get_connection(address, cert_string=pub_key, key_string=priv_key)
-        apns = APNs(conn)
-        return apns
+        f, path = tempfile.mkstemp()
+        try:
+            os.write(f, pub_key)
+            os.write(f, priv_key)
+            client = APNsClient(path, use_sandbox=sandbox, use_alternative_port=False)
+            return client
+        finally:
+            os.close(f)
+            os.remove(path)
     
     @classmethod
     def get_connection(cls, appid):
@@ -134,106 +136,61 @@ class IOSPush(object):
             if cls.check_p12_expired(p12, secret):
                 logging.warn("p12 expiry client id:%s", appid)
                 return None
-            apns = cls.connect_apns_server(sandbox, p12, secret, timestamp)
+            apns = cls.connect_apns_server(sandbox, p12, secret)
             cls.apns_manager.set_apns_connection(appid, apns)
         return apns
 
 
     @classmethod
     def get_pushkit_connection(cls, appid):
-        apns = cls.apns_manager.get_pushkit_connection(appid)
-        if not apns:
-            p12, secret, timestamp = application.get_pushkit_p12(cls.mysql, appid)
-            if not p12:
-                logging.warn("get p12 fail client id:%s", appid)
-                return None
-            if cls.check_p12_expired(p12, secret):
-                logging.warn("p12 expiry client id:%s", appid)
-                return None
-            apns = cls.connect_apns_server(sandbox, p12, secret, timestamp)
-            cls.apns_manager.set_pushkit_connection(appid, apns)
-        return apns
-    
+        return cls.get_connection(appid)
+
+    @classmethod
+    def get_bundle_id(cls, appid):
+        if appid in cls.bundle_ids:
+            return cls.bundle_ids[appid]
+        bundle_id = application.get_bundle_id(cls.mysql, appid)
+        if bundle_id:
+            cls.bundle_ids[appid] = bundle_id
+        return bundle_id
+
     @classmethod
     def voip_push(cls, appid, token, extra=None):
-        message = Message([token], extra=extra)
+        topic = cls.get_bundle_id(appid)
+        if not topic:
+            logging.warn("appid:%s no bundle id", appid)
+            return
 
-        for i in range(3):
-            if i > 0:
-                logging.warn("resend notification")
+        payload = Payload(custom=extra)
+        client = cls.get_pushkit_connection(appid)
+        try:
+            client.send_notification(token, payload, topic)
+            logging.debug("send voip notification:%s %s %s success", token)
+        except OpenSSL.SSL.Error, e:
+            logging.warn("ssl exception:%s", str(e))
+            cls.apns_manager.remove_apns_connection(appid)
+        except Exception, e:
+            logging.warn("send notification exception:%s", str(e))
+            cls.apns_manager.remove_apns_connection(appid)
 
-            apns = cls.get_pushkit_connection(appid)
-             
-            try:
-                logging.debug("send voip push:%s %s", message.tokens, extra)
-                result = apns.send(message)
-             
-                for token, (reason, explanation) in result.failed.items():
-                    # stop using that token
-                    logging.error("failed token:%s", token)
-             
-                for reason, explanation in result.errors:
-                    # handle generic errors
-                    logging.error("send notification fail: reason = %s, explanation = %s", reason, explanation)
-             
-                if result.needs_retry():
-                    # extract failed tokens as new message
-                    message = result.retry()
-                    # re-schedule task with the new message after some delay
-                    continue
-                else:
-                    break
-            except OpenSSL.SSL.Error, e:
-                logging.warn("ssl exception:%s", str(e))
-                cls.apns_manager.remove_pushkit_connection(appid)
-                err = e.message[0][2]
-                if "certificate expired" in err:
-                    break
-            except Exception, e:
-                logging.warn("send notification exception:%s", str(e))
-                cls.apns_manager.remove_pushkit_connection(appid)
-                
-    
     @classmethod
     def push(cls, appid, token, alert, sound="default", badge=0, content_available=0, extra=None):
-        message = Message([token], alert=alert, badge=badge, sound=sound, 
-                          content_available=content_available, extra=extra)
+        topic = cls.get_bundle_id(appid)
+        if not topic:
+            logging.warn("appid:%s no bundle id", appid)
+            return
 
-        for i in range(3):
-            if i > 0:
-                logging.warn("resend notification")
-
-            apns = cls.get_connection(appid)
-             
-            try:
-                logging.debug("send apns:%s %s %s", message.tokens, alert, badge)
-                result = apns.send(message)
-             
-                for token, (reason, explanation) in result.failed.items():
-                    # stop using that token
-                    logging.error("failed token:%s", token)
-             
-                for reason, explanation in result.errors:
-                    # handle generic errors
-                    logging.error("send notification fail: reason = %s, explanation = %s", reason, explanation)
-             
-                if result.needs_retry():
-                    # extract failed tokens as new message
-                    message = result.retry()
-                    # re-schedule task with the new message after some delay
-                    continue
-                else:
-                    break
-            except OpenSSL.SSL.Error, e:
-                logging.warn("ssl exception:%s", str(e))
-                cls.apns_manager.remove_apns_connection(appid)
-                err = e.message[0][2]
-                if "certificate expired" in err:
-                    break
-            except Exception, e:
-                logging.warn("send notification exception:%s", str(e))
-                cls.apns_manager.remove_apns_connection(appid)
-
+        payload = Payload(alert=alert, sound=sound, badge=badge, content_available=content_available, custom=extra)
+        client = cls.get_connection(appid)
+        try:
+            client.send_notification(token, payload, topic)
+            logging.debug("send apns:%s %s %s success", token, alert, badge)
+        except OpenSSL.SSL.Error, e:
+            logging.warn("ssl exception:%s", str(e))
+            cls.apns_manager.remove_apns_connection(appid)
+        except Exception, e:
+            logging.warn("send notification exception:%s %s", str(e), type(e))
+            cls.apns_manager.remove_apns_connection(appid)
 
     @classmethod
     def receive_p12_update_message(cls):
@@ -272,23 +229,22 @@ class IOSPush(object):
 
 
 def test_alert(sandbox):
-    f = open("imdemo_dev.p12", "rb")
+    f = open("imdemo.p12", "rb")
     p12 = f.read()
     f.close()
-    token = "b859063a8ad75b7f07ada8da9743d9589ddf6bc3954e2b3ee85afc865f0819ea"
-    alert = "测试ios推送"
+    token = "7b2a23d466cf2557fb4fa573e1cc5f63088cd060def124a9eca97ab251be08b5"
+    alert = u"测试ios推送"
     badge = 1
     sound = "default"
+    topic = "com.beetle.im.demo"
     print "p12", len(p12)
 
     extra = {"test":"hahah"}
-    apns = IOSPush.connect_apns_server(sandbox, p12, "", 0)
-    message = Message([token], alert=alert, badge=badge, 
-                      sound=sound, extra=extra)
-    
+    client = IOSPush.connect_apns_server(sandbox, p12, "")
+    payload = Payload(alert=alert, sound=sound, badge=badge, custom=extra)
+
     try:
-        result = apns.send(message)
-        print result
+        client.send_notification(token, payload, topic)
         time.sleep(1)
     except OpenSSL.SSL.Error, e:
         err = e.message[0][2]
@@ -301,19 +257,19 @@ def test_alert(sandbox):
 
 
 def test_content(sandbox):
-    f = open("imdemo_dev.p12", "rb")
+    f = open("imdemo.p12", "rb")
     p12 = f.read()
     f.close()
     print "p12", len(p12)
 
-    token = "b859063a8ad75b7f07ada8da9743d9589ddf6bc3954e2b3ee85afc865f0819ea"
+    token = "7b2a23d466cf2557fb4fa573e1cc5f63088cd060def124a9eca97ab251be08b5"
     extra = {"xiaowei":{"new":1}}
-    apns = IOSPush.connect_apns_server(sandbox, p12, "", 0)
-    message = Message([token], content_available=1, extra=extra)
-    
+    topic = "com.beetle.im.demo"
+
+    client = IOSPush.connect_apns_server(sandbox, p12, "")
+    payload = Payload(content_available=1, custom=extra)
     try:
-        result = apns.send(message)
-        print result
+        client.send_notification(token, payload, topic)
         time.sleep(1)
     except OpenSSL.SSL.Error, e:
         err = e.message[0][2]
@@ -326,30 +282,20 @@ def test_content(sandbox):
 
 
 def test_pushkit(sandbox):
-    f = open("imdemo_pushkit.p12", "rb")
+    f = open("imdemo.p12", "rb")
     p12 = f.read()
     f.close()
     print "p12", len(p12)
+    token = "d8ac6543fb492ae56c12c47ba254ee094ce58e1001f28543af9c337d6e674f8c"
+    topic = "com.beetle.im.demo.voip"
+    extra = {"voip":{"channel_id":"1", "command":"dial"}}
+    payload = Payload(custom=extra)
 
-    token = "144c67f2fde4b72de8ed4203e9672c064e12376ed340d55f8e04430e15ad5a47"
-    apns = IOSPush.connect_apns_server(sandbox, p12, "", 0)
-    
-    extra = {"voip":{"channel_id":"1", "command":"dial"}}    
-    message = Message([token], extra=extra)
-    
+    client = IOSPush.connect_apns_server(sandbox, p12, "")
+
     try:
-        result = apns.send(message)
-        for token, (reason, explanation) in result.failed.items():
-            # stop using that token
-            logging.error("failed token:%s", token)
-             
-        for reason, explanation in result.errors:
-            # handle generic errors
-            logging.error("send notification fail: reason = %s, explanation = %s", reason, explanation)
-        time.sleep(2)
-        extra = {"voip":{"channel_id":"1", "command":"hangup"}}    
-        message = Message([token], extra=extra)
-        result = apns.send(message)
+        client.send_notification(token, payload, topic)
+
         time.sleep(1)
     except OpenSSL.SSL.Error, e:
         err = e.message[0][2]
@@ -364,3 +310,5 @@ def test_pushkit(sandbox):
 if __name__ == "__main__":
     sandbox = True
     test_pushkit(sandbox)
+    test_content(sandbox)
+    test_alert(sandbox)

@@ -4,6 +4,10 @@ import sys
 import traceback
 
 
+PLATFORM_ANDROID = 1
+PLATFORM_IOS = 2
+
+
 def get_app_name(mysql, appid):
     for i in range(2):
         try:
@@ -14,6 +18,26 @@ def get_app_name(mysql, appid):
         except Exception, e:
             logging.info("exception:%s", str(e))
             continue
+    return ""
+
+
+def get_bundle_id(mysql, appid):
+    for i in range(2):
+        try:
+            sql = '''select platform_identity
+                      from  client where client.app_id=%s and client.platform_type=%s'''
+            cursor = mysql.execute(sql, (appid, PLATFORM_IOS))
+            obj = cursor.fetchone()
+            if obj:
+                bundle_id = obj["platform_identity"]
+                return bundle_id
+            else:
+                return None
+        except Exception, e:
+            traceback.print_exc(file=sys.stdout)
+            logging.info("exception:%s", str(e))
+            continue
+
     return ""
 
 
@@ -41,6 +65,7 @@ def get_p12(mysql, sandbox, appid):
             continue
 
     return None, None, None
+
 
 def get_pushkit_p12(mysql, appid):
     for i in range(2):

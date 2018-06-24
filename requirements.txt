@@ -2,3 +2,5 @@ aliyun-python-sdk-push=2.2.4
 xmltodict
 git+git://github.com/lostdragon/apns-client.git
 requesocks
+apns2==0.3.0
+requests
