@@ -13,6 +13,8 @@ import traceback
 import binascii
 import requests
 from urllib import urlencode
+from apns2.client import Notification
+from apns2.payload import Payload
 
 from utils import mysql
 from ios_push import IOSPush
@@ -50,6 +52,7 @@ WXPush.rds = rds
 
 app_names = {}
 
+
 class Store(object):
     def __init__(self):
         self.store_id = 0
@@ -63,6 +66,7 @@ class Store(object):
         s.store_id = store_id
         return s
 
+
 def get_title(appid):
     if not app_names.has_key(appid):
         name = application.get_app_name(mysql_db, appid)
@@ -73,6 +77,7 @@ def get_title(appid):
         return app_names[appid]
     else:
         return ""
+
 
 def push_content(sender_name, body):
     if not sender_name:
@@ -107,17 +112,19 @@ def push_content(sender_name, body):
             alert = "%s%s"%(sender_name, u"发来一条消息")
     return alert
 
+
 def ios_push(appid, token, content, badge, sound, extra):
-    alert = content
-    content_available = 0
-    IOSPush.push(appid, token, alert, sound, badge, content_available, extra)
+    IOSPush.push(appid, token, content, sound=sound, badge=badge, extra=extra)
+
 
 def ios_voip_push(appid, token, extra):
     IOSPush.voip_push(appid, token, extra)
-    
+
+
 def android_push(appid, appname, token, content, extra):
     token = binascii.a2b_hex(token)
     SmartPush.push(appid, appname, token, content, extra)
+
 
 def xg_push(appid, appname, token, content, extra):
     XGPush.push(appid, appname, token, content, extra)
@@ -265,6 +272,16 @@ def handle_group_message(msg):
     extra["sender"] = sender
     extra["group_id"] = group_id
 
+    apns_users = []
+    jp_users = []
+    xg_users = []
+    hw_users = []
+    gcm_users = []
+    mi_users = []
+    ali_users = []
+
+    #群聊中被at的用户
+    at_users = []
     for receiver in receivers:
         quiet = user.get_user_notification_setting(rds, appid, receiver, group_id)
         if quiet:
@@ -273,10 +290,76 @@ def handle_group_message(msg):
         if quiet and receiver not in at:
             continue
 
+        u = user.get_user(rds, appid, receiver)
+        if u is None:
+            logging.info("uid:%d nonexist", receiver)
+            continue
+
         if receiver in at and sender_name:
-            content = "%s在群聊中@了你"%sender_name
-        
-        push_message(appid, appname, receiver, content, extra)
+            at_users.append(u)
+            continue
+
+        # 找出最近绑定的token
+        ts = max(u.apns_timestamp, u.xg_timestamp, u.mi_timestamp,
+                 u.hw_timestamp, u.gcm_timestamp,
+                 u.ali_timestamp, u.jp_timestamp)
+
+        if u.apns_device_token and u.apns_timestamp == ts:
+            apns_users.append(u)
+        elif u.xg_device_token and u.xg_timestamp == ts:
+            xg_users.append(u)
+        elif u.mi_device_token and u.mi_timestamp == ts:
+            mi_users.append(u)
+        elif u.hw_device_token and u.hw_timestamp == ts:
+            hw_users.append(u)
+        elif u.gcm_device_token and u.gcm_timestamp == ts:
+            gcm_users.append(u)
+        elif u.ali_device_token and u.ali_timestamp == ts:
+            ali_users.append(u)
+        elif u.jp_device_token and u.jp_timestamp == ts:
+            jp_users.append(u)
+        else:
+            logging.info("uid:%d has't device token", receiver)
+
+    for u in at_users:
+        content = "%s在群聊中@了你"%sender_name
+        push_message_u(appid, appname, u, content, extra)
+
+    for u in xg_users:
+        xg_push(appid, appname, u.xg_device_token, content, extra)
+
+    for u in hw_users:
+        HuaWeiPush.push(appid, appname, u.hw_device_token, content)
+
+    for u in gcm_users:
+        GCMPush.push(appid, appname, u.gcm_device_token, content)
+
+    for u in mi_users:
+        MiPush.push(appid, appname, u.mi_device_token, content)
+
+    for u in ali_users:
+        AliPush.push(appid, appname, u.ali_device_token, content)
+
+    #ios apns
+    notifications = []
+    for u in apns_users:
+        sound = 'default'
+        payload = Payload(alert=content, sound=sound, badge=u.unread + 1,  custom=extra)
+        token = u.apns_device_token
+        n = Notification(token, payload)
+        notifications.append(n)
+
+    IOSPush.push_batch(appid, notifications)
+
+    for u in apns_users:
+        user.set_user_unread(rds, appid, receiver, u.unread+1)
+
+    #极光推送
+    tokens = []
+    for u in jp_users:
+        tokens.append(u.jp_device_token)
+    if tokens:
+        JGPush.push(appid, appname, tokens, content)
 
 
 def handle_customer_message(msg):

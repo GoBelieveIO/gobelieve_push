@@ -12,7 +12,6 @@ import OpenSSL
 from apns2.client import APNsClient
 from apns2.payload import Payload
 
-
 sandbox = config.SANDBOX
 
 class APNSConnectionManager:
@@ -191,6 +190,24 @@ class IOSPush(object):
         except Exception, e:
             logging.warn("send notification exception:%s %s", str(e), type(e))
             cls.apns_manager.remove_apns_connection(appid)
+
+    @classmethod
+    def push_batch(cls, appid, notifications):
+        topic = cls.get_bundle_id(appid)
+        if not topic:
+            logging.warn("appid:%s no bundle id", appid)
+            return
+        client = cls.get_connection(appid)
+        try:
+            results = client.send_notification_batch(notifications, topic)
+            logging.debug("push batch results:%s", results)
+        except OpenSSL.SSL.Error, e:
+            logging.warn("ssl exception:%s", str(e))
+            cls.apns_manager.remove_apns_connection(appid)
+        except Exception, e:
+            logging.warn("send notification exception:%s %s", str(e), type(e))
+            cls.apns_manager.remove_apns_connection(appid)
+
 
     @classmethod
     def receive_p12_update_message(cls):
