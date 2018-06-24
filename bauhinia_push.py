@@ -349,7 +349,8 @@ def handle_group_message(msg):
         n = Notification(token, payload)
         notifications.append(n)
 
-    IOSPush.push_batch(appid, notifications)
+    if notifications:
+        IOSPush.push_batch(appid, notifications)
 
     for u in apns_users:
         user.set_user_unread(rds, appid, receiver, u.unread+1)
