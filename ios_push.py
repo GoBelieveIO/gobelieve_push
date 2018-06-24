@@ -165,12 +165,12 @@ class IOSPush(object):
         client = cls.get_pushkit_connection(appid)
         try:
             client.send_notification(token, payload, voip_topic)
-            logging.debug("send voip notification:%s %s %s success", token)
+            logging.debug("send voip notification:%s success", token)
         except OpenSSL.SSL.Error, e:
             logging.warn("ssl exception:%s", str(e))
             cls.apns_manager.remove_apns_connection(appid)
         except Exception, e:
-            logging.warn("send notification exception:%s", str(e))
+            logging.warn("send notification exception:%s %s", str(e), type(e))
             cls.apns_manager.remove_apns_connection(appid)
 
     @classmethod
