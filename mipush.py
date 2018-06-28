@@ -31,9 +31,10 @@ class MiPush:
         return app
 
     @classmethod
-    def send(cls, mi_app_secret, device_token, title, content):
+    def send(cls, mi_app_secret, device_tokens, title, content):
+        reg_ids = ",".join(device_tokens)
         obj = {
-            "registration_id":device_token,
+            "registration_id":reg_ids,
             'title':title,
             'description':content,
             'pass_through':0,
@@ -85,10 +86,13 @@ class MiPush:
 
         mi_app_secret = app["mi_app_secret"]
         logging.debug("mi app secret:%s", mi_app_secret)
-        cls.send(mi_app_secret, token, appname, content)
+        cls.send(mi_app_secret, [token], appname, content)
 
     @classmethod
     def push_message(cls, appid, token, payload):
+        """
+        透传消息
+        """
         app = cls.get_app(appid)
         if app is None:
             logging.warning("can't read mi app secret")
@@ -97,6 +101,18 @@ class MiPush:
         mi_app_secret = app["mi_app_secret"]
         logging.debug("mi app secret:%s", mi_app_secret)
         cls.send_message(mi_app_secret, token, payload)
+
+    @classmethod
+    def push_batch(cls, appid, appname, tokens, content):
+        app = cls.get_app(appid)
+        if app is None:
+            logging.warning("can't read mi app secret")
+            return False
+
+        mi_app_secret = app["mi_app_secret"]
+        logging.debug("mi app secret:%s", mi_app_secret)
+        cls.send(mi_app_secret, tokens, appname, content)
+
         
     
 if __name__ == "__main__":

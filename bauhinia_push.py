@@ -129,6 +129,7 @@ def android_push(appid, appname, token, content, extra):
 def xg_push(appid, appname, token, content, extra):
     XGPush.push(appid, appname, token, content, extra)
 
+
 #发送系统消息的rpc接口
 def post_system_message(appid, uid, content):
     params = {
@@ -337,9 +338,6 @@ def handle_group_message(msg):
     for u in gcm_users:
         GCMPush.push(appid, appname, u.gcm_device_token, content)
 
-    for u in mi_users:
-        MiPush.push(appid, appname, u.mi_device_token, content)
-
     for u in ali_users:
         AliPush.push(appid, appname, u.ali_device_token, content)
 
@@ -364,6 +362,12 @@ def handle_group_message(msg):
         tokens.append(u.jp_device_token)
     if tokens:
         JGPush.push(appid, appname, tokens, content)
+
+    tokens = []
+    for u in mi_users:
+        tokens.append(u.mi_device_token)
+
+    MiPush.push_batch(appid, appname, tokens, content)
 
 
 def handle_customer_message(msg):
