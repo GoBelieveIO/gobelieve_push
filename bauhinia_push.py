@@ -207,6 +207,7 @@ def push_message_u(appid, appname, u, content, extra):
     else:
         logging.info("uid:%d has't device token", receiver)
 
+
 def push_message(appid, appname, receiver, content, extra):
     u = user.get_user(rds, appid, receiver)
     if u is None:
@@ -265,8 +266,10 @@ def handle_group_message(msg):
     try:
         c = json.loads(obj["content"])
         at = c.get('at', [])
+        at_all = c.get('at_all', False)
     except ValueError:
         at = []
+        at_all = False
         
     extra = {}
     extra["sender"] = sender
@@ -295,7 +298,7 @@ def handle_group_message(msg):
             logging.info("uid:%d nonexist", receiver)
             continue
 
-        if receiver in at and sender_name:
+        if (at_all or receiver in at) and sender_name:
             at_users.append(u)
             continue
 
@@ -510,9 +513,11 @@ def main():
             time.sleep(1)
             continue
 
+
 def print_exception_traceback():
     exc_type, exc_value, exc_traceback = sys.exc_info()
     logging.warn("exception traceback:%s", traceback.format_exc())
+
 
 def init_logger(logger):
     root = logger
@@ -523,6 +528,7 @@ def init_logger(logger):
     formatter = logging.Formatter('%(asctime)s %(filename)s:%(lineno)d -  %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
     root.addHandler(ch)
+
 
 if __name__ == "__main__":
     init_logger(logging.getLogger(''))
