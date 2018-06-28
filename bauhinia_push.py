@@ -113,14 +113,6 @@ def push_content(sender_name, body):
     return alert
 
 
-def ios_push(appid, token, content, badge, sound, extra):
-    IOSPush.push(appid, token, content, sound=sound, badge=badge, extra=extra)
-
-
-def ios_voip_push(appid, token, extra):
-    IOSPush.voip_push(appid, token, extra)
-
-
 def android_push(appid, appname, token, content, extra):
     token = binascii.a2b_hex(token)
     SmartPush.push(appid, appname, token, content, extra)
@@ -179,7 +171,8 @@ def push_customer_support_message(appid, appname, u, content, extra):
         logging.info("uid:%d has't device token", receiver)
 
 
-def push_message_u(appid, appname, u, content, extra):
+
+def push_message_u(appid, appname, u, content, extra, collapse_id=None):
     receiver = u.uid
     #找出最近绑定的token
     ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp,
@@ -188,8 +181,9 @@ def push_message_u(appid, appname, u, content, extra):
 
     if u.apns_device_token and u.apns_timestamp == ts:
         sound = 'default'
-        ios_push(appid, u.apns_device_token, content,
-                 u.unread + 1, sound, extra)
+        IOSPush.push(appid, u.apns_device_token, content,
+                     sound=sound, badge=u.unread+1,
+                     extra=extra, collapse_id=collapse_id)
         user.set_user_unread(rds, appid, receiver, u.unread+1)
     elif u.ng_device_token and u.ng_timestamp == ts:
         android_push(appid, appname, u.ng_device_token, content, extra)
@@ -209,13 +203,13 @@ def push_message_u(appid, appname, u, content, extra):
         logging.info("uid:%d has't device token", receiver)
 
 
-def push_message(appid, appname, receiver, content, extra):
+def push_message(appid, appname, receiver, content, extra, collapse_id=None):
     u = user.get_user(rds, appid, receiver)
     if u is None:
         logging.info("uid:%d nonexist", receiver)
         return
 
-    push_message_u(appid, appname, u, content, extra)
+    push_message_u(appid, appname, u, content, extra, collapse_id=collapse_id)
 
     
 def handle_im_message(msg):
@@ -233,16 +227,23 @@ def handle_im_message(msg):
 
     appname = get_title(appid)
     sender_name = user.get_user_name(rds, appid, sender)
-    content = push_content(sender_name, obj["content"])
-
     extra = {}
     extra["sender"] = sender
 
     do_not_disturb = user.get_user_do_not_disturb(rds, appid, receiver, sender)
-    if not do_not_disturb:
-        push_message(appid, appname, receiver, content, extra)
-    else:
+    if do_not_disturb:
         logging.debug("uid:%s set do not disturb :%s", receiver, sender)
+        return
+
+    content_obj = json.loads(obj['content'])
+    if content_obj.get('revoke'):
+        collapse_id = content_obj.get('revoke').get('msgid')
+        sender_name = sender_name if sender_name else ''
+        content = "%s撤回了一条消息"%sender_name
+    else:
+        collapse_id = content_obj.get('uuid')
+        content = push_content(sender_name, obj["content"])
+    push_message(appid, appname, receiver, content, extra, collapse_id=collapse_id)
 
 
 def handle_group_message(msg):
@@ -266,11 +267,17 @@ def handle_group_message(msg):
     
     try:
         c = json.loads(obj["content"])
+        collapse_id = c.get('uuid')
+        if c.has_key('revoke'):
+            collapse_id = c['revoke']['msgid']
+            sender_name = sender_name if sender_name else ''
+            content = "%s撤回了一条消息" % sender_name
         at = c.get('at', [])
         at_all = c.get('at_all', False)
     except ValueError:
         at = []
         at_all = False
+        collapse_id = None
         
     extra = {}
     extra["sender"] = sender
@@ -351,7 +358,7 @@ def handle_group_message(msg):
         notifications.append(n)
 
     if notifications:
-        IOSPush.push_batch(appid, notifications)
+        IOSPush.push_batch(appid, notifications, collapse_id)
 
     for u in apns_users:
         user.set_user_unread(rds, appid, receiver, u.unread+1)
@@ -464,10 +471,10 @@ def handle_system_message(msg):
 
     if u.apns_device_token and u.apns_timestamp == ts:
         if voip_content and u.pushkit_device_token:
-            ios_voip_push(appid, u.pushkit_device_token, voip_content)
+            IOSPush.voip_push(appid, u.pushkit_device_token, voip_content)
         elif content:
-            ios_push(appid, u.apns_device_token, content,
-                     u.unread + 1, sound, {})
+            IOSPush.push(appid, u.apns_device_token, content,
+                         sound=sound, badge=u.unread+1)
             user.set_user_unread(rds, appid, receiver, u.unread+1)
         return
     

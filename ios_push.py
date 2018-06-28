@@ -174,7 +174,7 @@ class IOSPush(object):
             cls.apns_manager.remove_apns_connection(appid)
 
     @classmethod
-    def push(cls, appid, token, alert, sound="default", badge=0, content_available=0, extra=None):
+    def push(cls, appid, token, alert, sound="default", badge=0, content_available=0, extra=None, collapse_id=None):
         topic = cls.get_bundle_id(appid)
         if not topic:
             logging.warn("appid:%s no bundle id", appid)
@@ -183,7 +183,7 @@ class IOSPush(object):
         payload = Payload(alert=alert, sound=sound, badge=badge, content_available=content_available, custom=extra)
         client = cls.get_connection(appid)
         try:
-            client.send_notification(token, payload, topic)
+            client.send_notification(token, payload, topic, collapse_id=collapse_id)
             logging.debug("send apns:%s %s %s success", token, alert, badge)
         except OpenSSL.SSL.Error, e:
             logging.warn("ssl exception:%s", str(e))
@@ -193,14 +193,14 @@ class IOSPush(object):
             cls.apns_manager.remove_apns_connection(appid)
 
     @classmethod
-    def push_batch(cls, appid, notifications):
+    def push_batch(cls, appid, notifications, collapse_id=None):
         topic = cls.get_bundle_id(appid)
         if not topic:
             logging.warn("appid:%s no bundle id", appid)
             return
         client = cls.get_connection(appid)
         try:
-            results = client.send_notification_batch(notifications, topic)
+            results = client.send_notification_batch(notifications, topic, collapse_id=collapse_id)
             logging.debug("push batch results:%s", results)
         except OpenSSL.SSL.Error, e:
             logging.warn("ssl exception:%s", str(e))
