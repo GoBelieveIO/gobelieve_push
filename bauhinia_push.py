@@ -299,7 +299,7 @@ def handle_im_messages(msgs):
         JGPush.push(u.appid, appname, u.jp_device_token, content)
 
     for u, appname, content, _ in mi_users:
-        JGPush.push(u.appid, appname, u.mi_device_token, content)
+        MiPush.push(u.appid, appname, u.mi_device_token, content)
 
     # ios apns
     notifications = []
