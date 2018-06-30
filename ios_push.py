@@ -11,8 +11,13 @@ import tempfile
 import OpenSSL
 from apns2.client import APNsClient
 from apns2.payload import Payload
+from apns2.client import RequestStream
+
+import collections
 
 sandbox = config.SANDBOX
+
+Notification = collections.namedtuple('Notification', ['token', 'payload', 'collapse_id'])
 
 class APNSConnectionManager:
     def __init__(self):
@@ -193,7 +198,10 @@ class IOSPush(object):
             cls.apns_manager.remove_apns_connection(appid)
 
     @classmethod
-    def push_batch(cls, appid, notifications, collapse_id=None):
+    def push_group_batch(cls, appid, notifications, collapse_id=None):
+        """
+        相同的collapse_id
+        """
         topic = cls.get_bundle_id(appid)
         if not topic:
             logging.warn("appid:%s no bundle id", appid)
@@ -201,13 +209,86 @@ class IOSPush(object):
         client = cls.get_connection(appid)
         try:
             results = client.send_notification_batch(notifications, topic, collapse_id=collapse_id)
-            logging.debug("push batch results:%s", results)
+            logging.debug("push group batch results:%s", results)
         except OpenSSL.SSL.Error, e:
             logging.warn("ssl exception:%s", str(e))
             cls.apns_manager.remove_apns_connection(appid)
         except Exception, e:
             logging.warn("send notification exception:%s %s", str(e), type(e))
             cls.apns_manager.remove_apns_connection(appid)
+
+    @classmethod
+    def push_peer_batch(cls, appid, notifications):
+        """
+        不同的collapse_id
+        """
+        topic = cls.get_bundle_id(appid)
+        if not topic:
+            logging.warn("appid:%s no bundle id", appid)
+            return
+        client = cls.get_connection(appid)
+        try:
+            results = cls.send_notification_batch(client, notifications, topic)
+            logging.debug("push peer batch results:%s", results)
+        except OpenSSL.SSL.Error, e:
+            logging.warn("ssl exception:%s", str(e))
+            cls.apns_manager.remove_apns_connection(appid)
+        except Exception, e:
+            logging.warn("send notification exception:%s %s", str(e), type(e))
+            cls.apns_manager.remove_apns_connection(appid)
+
+    @classmethod
+    def send_notification_batch(cls, client, notifications, topic):
+        '''
+        Send a notification to a list of tokens in batch. Instead of sending a synchronous request
+        for each token, send multiple requests concurrently. This is done on the same connection,
+        using HTTP/2 streams (one request per stream).
+
+        APNs allows many streams simultaneously, but the number of streams can vary depending on
+        server load. This method reads the SETTINGS frame sent by the server to figure out the
+        maximum number of concurrent streams. Typically, APNs reports a maximum of 500.
+
+        The function returns a dictionary mapping each token to its result. The result is "Success"
+        if the token was sent successfully, or the string returned by APNs in the 'reason' field of
+        the response, if the token generated an error.
+        '''
+        notification_iterator = iter(notifications)
+        next_notification = next(notification_iterator, None)
+
+        # Make sure we're connected to APNs, so that we receive and process the server's SETTINGS
+        # frame before starting to send notifications.
+        client.connect()
+
+        results = {}
+        open_streams = collections.deque()
+        # Loop on the tokens, sending as many requests as possible concurrently to APNs.
+        # When reaching the maximum concurrent streams limit, wait for a response before sending
+        # another request.
+        while len(open_streams) > 0 or next_notification is not None:
+            # Update the max_concurrent_streams on every iteration since a SETTINGS frame can be
+            # sent by the server at any time.
+            client.update_max_concurrent_streams()
+            if client.should_send_notification(next_notification, open_streams):
+                logging.info('Sending to token %s', next_notification.token)
+                stream_id = client.send_notification_async(next_notification.token,
+                                                           next_notification.payload, topic,
+                                                           collapse_id=next_notification.collapse_id)
+                open_streams.append(RequestStream(stream_id, next_notification.token))
+
+                next_notification = next(notification_iterator, None)
+                if next_notification is None:
+                    # No tokens remaining. Proceed to get results for pending requests.
+                    logging.info('Finished sending all tokens, waiting for pending requests.')
+            else:
+                # We have at least one request waiting for response (otherwise we would have either
+                # sent new requests or exited the while loop.) Wait for the first outstanding stream
+                # to return a response.
+                pending_stream = open_streams.popleft()
+                result = client.get_notification_result(pending_stream.stream_id)
+                logging.info('Got response for %s: %s', pending_stream.token, result)
+                results[pending_stream.token] = result
+
+        return results
 
 
     @classmethod
