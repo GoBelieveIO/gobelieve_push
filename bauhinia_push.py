@@ -449,11 +449,11 @@ def send_group_message(obj):
         user.set_user_unread(rds, appid, receiver, u.unread + 1)
 
     # 极光推送
-    tokens = []
-    for u in jp_users:
-        tokens.append(u.jp_device_token)
-    if tokens:
-        JGPush.push(appid, appname, tokens, content)
+    #tokens = []
+    #for u in jp_users:
+    #    tokens.append(u.jp_device_token)
+    #if tokens:
+    #    JGPush.push(appid, appname, tokens, content)
 
     tokens = []
     for u in mi_users:
