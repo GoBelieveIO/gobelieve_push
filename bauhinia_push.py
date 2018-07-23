@@ -459,7 +459,8 @@ def send_group_message(obj):
     for u in mi_users:
         tokens.append(u.mi_device_token)
 
-    MiPush.push_batch(appid, appname, tokens, content)
+    if tokens:
+        MiPush.push_batch(appid, appname, tokens, content)
 
 
 def handle_group_messages(msgs):
