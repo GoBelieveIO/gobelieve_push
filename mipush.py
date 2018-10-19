@@ -33,12 +33,14 @@ class MiPush:
     @classmethod
     def send(cls, mi_app_secret, device_tokens, title, content):
         reg_ids = ",".join(device_tokens)
+
         obj = {
             "registration_id":reg_ids,
             'title':title,
             'description':content,
             'pass_through':0,
             'notify_type':-1,
+            'time_to_live':10*60*1000,#10minute
             'extra.notify_effect':1,
             'extra.notify_foreground':"0",
         }
