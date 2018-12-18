@@ -3,9 +3,11 @@
 """
 import logging
 import pymysql
+import time
 
-LOGGER = logging.getLogger('')
 
+
+PING_TIMER = 5*60 #mysql长连接  ping/5min
 
 class Cursor(object):
     def __init__(self, c, affected_rows):
@@ -45,6 +47,7 @@ class Mysql(object):
         self.port = port
         self.charset = charset
         self.autocommit = autocommit
+        self.ping_ts = 0
 
     @property
     def conn(self):
@@ -61,7 +64,16 @@ class Mysql(object):
             'sql': sql,
             'args': args
         }
-        LOGGER.debug("sql_execute:{}".format(evt))
+        logging.debug("sql_execute:{}".format(evt))
+        if not self.conn.open:
+            self.conn.connect()
+            
+        now = int(time.time())
+        if now - self.ping_ts > PING_TIMER:
+            logging.debug("mysql ping...")
+            self.conn.ping(reconnect=True)
+            self.ping_ts = now
+            
         if not isinstance(args, (tuple, list, set)):
             args = (args,)
         with self.conn.cursor() as cursor:
