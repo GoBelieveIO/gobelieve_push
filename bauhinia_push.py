@@ -37,7 +37,9 @@ MSG_CUSTOMER_SUPPORT = 25 #客服->顾客
 
 rds = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, 
                         db=config.REDIS_DB, password=config.REDIS_PASSWORD)
-mysql_db = mysql.Mysql.instance(*config.MYSQL)
+mysql_db = mysql.Mysql(config.MYSQL_HOST, config.MYSQL_USER, config.MYSQL_PASSWD,
+                       config.MYSQL_DATABASE, config.MYSQL_PORT,
+                       config.MYSQL_CHARSET, config.MYSQL_AUTOCOMMIT)
 
 IOSPush.mysql = mysql_db
 SmartPush.mysql = mysql_db
