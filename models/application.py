@@ -41,6 +41,26 @@ def get_bundle_id(mysql, appid):
     return ""
 
 
+def get_package_name(mysql, appid):
+    for i in range(2):
+        try:
+            sql = '''select platform_identity
+                      from  client where client.app_id=%s and client.platform_type=%s'''
+            cursor = mysql.execute(sql, (appid, PLATFORM_ANDROID))
+            obj = cursor.fetchone()
+            if obj:
+                bundle_id = obj["platform_identity"]
+                return bundle_id
+            else:
+                return None
+        except Exception, e:
+            traceback.print_exc(file=sys.stdout)
+            logging.info("exception:%s", str(e))
+            continue
+
+    return ""
+
+
 def get_p12(mysql, sandbox, appid):
     for i in range(2):
         try:
