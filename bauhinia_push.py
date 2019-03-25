@@ -697,7 +697,7 @@ def receive_offline_message():
             item = rds.blpop(("push_queue",
                               "group_push_queue",
                               "customer_push_queue",
-                              "system_push_queue"))
+                              "system_push_queue"), 120)
             if item:
                 q, msg = item
                 if q == "push_queue":
