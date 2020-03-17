@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-import requests
-import requesocks
-import json
 import logging
 import time
 from fcm import FCMNotification
@@ -18,7 +15,7 @@ class FCMPush:
     mysql = None
     fcm_apps = {}
     @classmethod
-    def get_fcm_app(cls, appid):
+    def get_gcm_app(cls, appid):
         now = int(time.time())
         app = cls.fcm_apps[appid] if cls.fcm_apps.has_key(appid) else None
         #app不在缓存中或者缓存超时,从数据库获取最新的accessid和secretkey
@@ -46,7 +43,7 @@ class FCMPush:
    
     @classmethod
     def send_batch(cls, api_key, device_tokens, title, content):
-        res = cls.fcm.notify_multiple_device(api_key=api_key, registration_ids=device_tokens, message_title=title, message_body=content)
+        res = cls.fcm.notify_multiple_devices(api_key=api_key, registration_ids=device_tokens, message_title=title, message_body=content)
         if res["failure"] > 0:
             logging.error("send fcm message error:%s", res)
         else:
@@ -76,6 +73,6 @@ class FCMPush:
 
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.DEBUG)
-    token = "ebo_XvqtoRY:APA91bFFeWTiHA2_nJAQTYaYRRk9Cwxoeod2taiIH8lKp5gNyPMnwvaQ6JU7ShwZAj5aI-7iTZjoFX98z-GlnDjlZ4MtDybIaRVQIw3vgUk0hnNmY9ZoALmLyPFRI6ZbrJ9tSfvmJlaT"
-    API_KEY = "AIzaSyDj7XHkwFoox6Ip04DcOnW_RG4IIQcPjvg"
-    FCMPush.send(API_KEY, token, "test", "测试FCM推送")
+    token = "fXux1H5cRLc:APA91bG7w4Mutqt1TSN42JipxME8rwpgA-kDX_7W9tJqx5tpcSJEGVn-QXnslcxK915XI5RCzzMktp_-K1At2xSi6CVhmB7MKedT-2JEbwyv3cEJuUIZIGK5ANHgntmByCaebM45r-wO"
+    API_KEY = "AAAAHFTLBsc:APA91bH4nR0revyNzlMUIhrMjlAUKvZvUypeY1uUaJnGWuW-CSYCLyBs88fPTfr9qPyvx34X1UbT4BfDtrQt9PgWKkSEZkUS30XG_gRF3yPMWVre2aDm9ENf43MWB2wboyjO1bjmgKsM"
+    FCMPush.send(API_KEY, token, "IMDemo", "test11ddfsf1")

@@ -86,7 +86,6 @@ class FCMNotification(object):
                                               headers=headers, timeout=timeout)
         if 'Retry-After' in response.headers and int(response.headers['Retry-After']) > 0:
             sleep_time = int(response.headers['Retry-After'])
-            print "sleep...", sleep_time
             time.sleep(sleep_time)
             return self.do_request(payload, timeout)
         return response

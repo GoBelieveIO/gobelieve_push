@@ -10,7 +10,6 @@ import redis
 import json
 import config
 import traceback
-import binascii
 import requests
 from urllib import urlencode
 from apns2.payload import Payload
@@ -18,7 +17,6 @@ from apns2.payload import Payload
 from utils import mysql
 from ios_push import Notification
 from ios_push import IOSPush
-from android_push import SmartPush
 from xg_push import XGPush
 from huawei import HuaWeiPush
 from fcm_push import FCMPush
@@ -42,7 +40,6 @@ mysql_db = mysql.Mysql(config.MYSQL_HOST, config.MYSQL_USER, config.MYSQL_PASSWD
                        config.MYSQL_CHARSET, config.MYSQL_AUTOCOMMIT)
 
 IOSPush.mysql = mysql_db
-SmartPush.mysql = mysql_db
 XGPush.mysql = mysql_db
 HuaWeiPush.mysql = mysql_db
 FCMPush.mysql = mysql_db
@@ -115,11 +112,6 @@ def push_content(sender_name, body):
     return alert
 
 
-def android_push(appid, appname, token, content, extra):
-    token = binascii.a2b_hex(token)
-    SmartPush.push(appid, appname, token, content, extra)
-
-
 def xg_push(appid, appname, token, content, extra):
     XGPush.push(appid, appname, token, content, extra)
 
@@ -152,8 +144,6 @@ def push_customer_support_message(appid, appname, u, content, extra):
         IOSPush.push(appid, u.apns_device_token, alert, 
                      sound, badge, content_available, extra)
         user.set_user_unread(rds, appid, receiver, u.unread+1)
-    elif u.ng_device_token and u.ng_timestamp == ts:
-        android_push(appid, appname, u.ng_device_token, content, extra)
     elif u.xg_device_token and u.xg_timestamp == ts:
         xg_push(appid, appname, u.xg_device_token, content, extra)
     elif u.mi_device_token and u.mi_timestamp == ts:
@@ -187,8 +177,6 @@ def push_message_u(appid, appname, u, content, extra, collapse_id=None):
                      sound=sound, badge=u.unread+1,
                      extra=extra, collapse_id=collapse_id)
         user.set_user_unread(rds, appid, receiver, u.unread+1)
-    elif u.ng_device_token and u.ng_timestamp == ts:
-        android_push(appid, appname, u.ng_device_token, content, extra)
     elif u.xg_device_token and u.xg_timestamp == ts:
         xg_push(appid, appname, u.xg_device_token, content, extra)
     elif u.mi_device_token and u.mi_timestamp == ts:
@@ -317,6 +305,7 @@ def handle_im_messages(msgs):
 
     for u, appname, content, collapse_id in apns_users:
         user.set_user_unread(rds, u.appid, u.uid, u.unread + 1)
+
 
 # 已不再使用
 def handle_im_message(msg):
