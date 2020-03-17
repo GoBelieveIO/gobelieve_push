@@ -21,7 +21,7 @@ from ios_push import IOSPush
 from android_push import SmartPush
 from xg_push import XGPush
 from huawei import HuaWeiPush
-from gcm import GCMPush
+from fcm_push import FCMPush
 from mipush import MiPush
 from wx_push import WXPush
 from ali_push import AliPush
@@ -45,7 +45,7 @@ IOSPush.mysql = mysql_db
 SmartPush.mysql = mysql_db
 XGPush.mysql = mysql_db
 HuaWeiPush.mysql = mysql_db
-GCMPush.mysql = mysql_db
+FCMPush.mysql = mysql_db
 MiPush.mysql = mysql_db
 AliPush.mysql = mysql_db
 JGPush.mysql = mysql_db
@@ -161,7 +161,7 @@ def push_customer_support_message(appid, appname, u, content, extra):
     elif u.hw_device_token and u.hw_timestamp == ts:
         HuaWeiPush.push(appid, appname, u.hw_device_token, content)
     elif u.gcm_device_token and u.gcm_timestamp == ts:
-        GCMPush.push(appid, appname, u.gcm_device_token, content)
+        FCMPush.push(appid, appname, u.gcm_device_token, content)
     elif u.ali_device_token and u.ali_timestamp == ts:
         AliPush.push(appid, appname, u.ali_device_token, content)
         #通过透传消息通知app有新消息到达
@@ -196,7 +196,7 @@ def push_message_u(appid, appname, u, content, extra, collapse_id=None):
     elif u.hw_device_token and u.hw_timestamp == ts:
         HuaWeiPush.push(appid, appname, u.hw_device_token, content)
     elif u.gcm_device_token and u.gcm_timestamp == ts:
-        GCMPush.push(appid, appname, u.gcm_device_token, content)
+        FCMPush.push(appid, appname, u.gcm_device_token, content)
     elif u.ali_device_token and u.ali_timestamp == ts:
         AliPush.push(appid, appname, u.ali_device_token, content)
     elif u.jp_device_token and u.jp_timestamp == ts:
@@ -292,7 +292,7 @@ def handle_im_messages(msgs):
         HuaWeiPush.push(u.appid, appname, u.hw_device_token, content)
 
     for u, appname, content, _ in gcm_users:
-        GCMPush.push(u.appid, appname, u.gcm_device_token, content)
+        FCMPush.push(u.appid, appname, u.gcm_device_token, content)
 
     for u, appname, content, _ in ali_users:
         AliPush.push(u.appid, appname, u.ali_device_token, content)
@@ -441,8 +441,8 @@ def send_group_message(obj):
     for u in hw_users:
         HuaWeiPush.push(appid, appname, u.hw_device_token, content)
 
-    for u in gcm_users:
-        GCMPush.push(appid, appname, u.gcm_device_token, content)
+    gcm_device_tokens = [u.gcm_device_token for u in gcm_users]
+    FCMPush.push_batch(appid, appname, gcm_device_tokens, content)
 
     for u in ali_users:
         AliPush.push(appid, appname, u.ali_device_token, content)
