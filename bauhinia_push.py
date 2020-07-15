@@ -31,7 +31,7 @@ MSG_CUSTOMER_SUPPORT = 25 #客服->顾客
 
 
 rds = redis.StrictRedis(host=config.REDIS_HOST, port=config.REDIS_PORT, 
-                        db=config.REDIS_DB, password=config.REDIS_PASSWORD)
+                        db=config.REDIS_DB, password=config.REDIS_PASSWORD, decode_responses=True)
 mysql_db = mysql.Mysql(config.MYSQL_HOST, config.MYSQL_USER, config.MYSQL_PASSWD,
                        config.MYSQL_DATABASE, config.MYSQL_PORT,
                        config.MYSQL_CHARSET, config.MYSQL_AUTOCOMMIT)
@@ -417,7 +417,8 @@ def send_group_message(obj):
         HuaWeiPush.push(appid, appname, u.hw_device_token, content)
 
     gcm_device_tokens = [u.gcm_device_token for u in gcm_users]
-    FCMPush.push_batch(appid, appname, gcm_device_tokens, content)
+    if gcm_device_tokens:
+        FCMPush.push_batch(appid, appname, gcm_device_tokens, content)
 
     for u in ali_users:
         AliPush.push(appid, appname, u.ali_device_token, content)
@@ -482,8 +483,8 @@ def handle_group_messages(msgs):
             else:
                 msgs_dict[msg_uuid]['receivers'].extend(obj['receivers'])
 
-    a1 = msgs_dict.values()
-    a2 = revoke_msgs_dict.values()
+    a1 = list(msgs_dict.values())
+    a2 = list(revoke_msgs_dict.values())
     a1.extend(a2)
 
     for obj in a1:

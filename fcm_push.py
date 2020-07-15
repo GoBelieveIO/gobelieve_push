@@ -17,7 +17,7 @@ class FCMPush:
     @classmethod
     def get_gcm_app(cls, appid):
         now = int(time.time())
-        app = cls.fcm_apps[appid] if cls.fcm_apps.has_key(appid) else None
+        app = cls.fcm_apps.get(appid)
         #app不在缓存中或者缓存超时,从数据库获取最新的accessid和secretkey
         if app is None or now - app["timestamp"] > 60:
             sender_id, api_key = application.get_gcm_key(cls.mysql, appid)
