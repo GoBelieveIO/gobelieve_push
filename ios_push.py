@@ -32,7 +32,7 @@ class APNSConnectionManager:
         self.lock.acquire()
         try:
             connections = self.pushkit_connections
-            apns = connections[appid] if connections.has_key(appid) else None
+            apns = connections.get(appid)
             if apns:
                 ts = self.pushkit_timestamps[appid]
                 now = int(time.time())
@@ -49,7 +49,7 @@ class APNSConnectionManager:
         self.lock.acquire()
         try:
             connections = self.pushkit_connections
-            if connections.has_key(appid):
+            if appid in connections:
                 logging.debug("pop pushkit connection:%s", appid)
                 connections.pop(appid)
         finally:
@@ -67,7 +67,7 @@ class APNSConnectionManager:
         self.lock.acquire()
         try:
             connections = self.apns_connections
-            apns = connections[appid] if connections.has_key(appid) else None
+            apns = connections.get(appid)
             if apns:
                 ts = self.connection_timestamps[appid]
                 now = int(time.time())
@@ -84,7 +84,7 @@ class APNSConnectionManager:
         self.lock.acquire()
         try:
             connections = self.apns_connections
-            if connections.has_key(appid):
+            if appid in connections:
                 logging.debug("pop client:%s", appid)
                 connections.pop(appid)
         finally:
@@ -171,10 +171,10 @@ class IOSPush(object):
         try:
             client.send_notification(token, payload, voip_topic)
             logging.debug("send voip notification:%s success", token)
-        except OpenSSL.SSL.Error, e:
+        except OpenSSL.SSL.Error as e:
             logging.warn("ssl exception:%s", str(e))
             cls.apns_manager.remove_apns_connection(appid)
-        except Exception, e:
+        except Exception as e:
             logging.warn("send notification exception:%s %s", str(e), type(e))
             cls.apns_manager.remove_apns_connection(appid)
 
@@ -190,10 +190,10 @@ class IOSPush(object):
         try:
             client.send_notification(token, payload, topic, collapse_id=collapse_id)
             logging.debug("send apns:%s %s %s success", token, alert, badge)
-        except OpenSSL.SSL.Error, e:
+        except OpenSSL.SSL.Error as e:
             logging.warn("ssl exception:%s", str(e))
             cls.apns_manager.remove_apns_connection(appid)
-        except Exception, e:
+        except Exception as e:
             logging.warn("send notification exception:%s %s", str(e), type(e))
             cls.apns_manager.remove_apns_connection(appid)
 
@@ -210,10 +210,10 @@ class IOSPush(object):
         try:
             results = client.send_notification_batch(notifications, topic, collapse_id=collapse_id)
             logging.debug("push group batch results:%s", results)
-        except OpenSSL.SSL.Error, e:
+        except OpenSSL.SSL.Error as e:
             logging.warn("ssl exception:%s", str(e))
             cls.apns_manager.remove_apns_connection(appid)
-        except Exception, e:
+        except Exception as e:
             logging.warn("send notification exception:%s %s", str(e), type(e))
             cls.apns_manager.remove_apns_connection(appid)
 
@@ -230,10 +230,10 @@ class IOSPush(object):
         try:
             results = cls.send_notification_batch(client, notifications, topic)
             logging.debug("push peer batch results:%s", results)
-        except OpenSSL.SSL.Error, e:
+        except OpenSSL.SSL.Error as e:
             logging.warn("ssl exception:%s", str(e))
             cls.apns_manager.remove_apns_connection(appid)
-        except Exception, e:
+        except Exception as e:
             logging.warn("send notification exception:%s %s", str(e), type(e))
             cls.apns_manager.remove_apns_connection(appid)
 
@@ -316,7 +316,7 @@ class IOSPush(object):
         while True:
             try:
                 cls.receive_p12_update_message()
-            except Exception, e:
+            except Exception as e:
                 logging.exception(e)
 
     @classmethod
@@ -336,7 +336,7 @@ def test_alert(sandbox):
     badge = 1
     sound = "default"
     topic = "com.beetle.im.demo"
-    print "p12", len(p12)
+    print("p12", len(p12))
 
     extra = {"test":"hahah"}
     client = IOSPush.connect_apns_server(sandbox, p12, "")
@@ -345,13 +345,13 @@ def test_alert(sandbox):
     try:
         client.send_notification(token, payload, topic)
         time.sleep(1)
-    except OpenSSL.SSL.Error, e:
+    except OpenSSL.SSL.Error as e:
         err = e.message[0][2]
-        print "certificate expired" in err
-        print "ssl exception:", e, type(e), dir(e), e.args, e.message
+        print("certificate expired" in err)
+        print("ssl exception:", e, type(e), dir(e), e.args, e.message)
         raise e
-    except Exception, e:
-        print "exception:", e, type(e), dir(e), e.args, e.message
+    except Exception as e:
+        print("exception:", e, type(e), dir(e), e.args, e.message)
         raise e
 
 
@@ -359,7 +359,7 @@ def test_content(sandbox):
     f = open("imdemo.p12", "rb")
     p12 = f.read()
     f.close()
-    print "p12", len(p12)
+    print("p12", len(p12))
 
     token = "7b2a23d466cf2557fb4fa573e1cc5f63088cd060def124a9eca97ab251be08b5"
     extra = {"xiaowei":{"new":1}}
@@ -370,13 +370,13 @@ def test_content(sandbox):
     try:
         client.send_notification(token, payload, topic)
         time.sleep(1)
-    except OpenSSL.SSL.Error, e:
+    except OpenSSL.SSL.Error as e:
         err = e.message[0][2]
-        print "certificate expired" in err
-        print "ssl exception:", e, type(e), dir(e), e.args, e.message
+        print("certificate expired" in err)
+        print("ssl exception:", e, type(e), dir(e), e.args, e.message)
         raise e
-    except Exception, e:
-        print "exception:", e, type(e), dir(e), e.args, e.message
+    except Exception as e:
+        print("exception:", e, type(e), dir(e), e.args, e.message)
         raise e
 
 
@@ -384,7 +384,7 @@ def test_pushkit(sandbox):
     f = open("imdemo.p12", "rb")
     p12 = f.read()
     f.close()
-    print "p12", len(p12)
+    print("p12", len(p12))
     token = "d8ac6543fb492ae56c12c47ba254ee094ce58e1001f28543af9c337d6e674f8c"
     topic = "com.beetle.im.demo.voip"
     extra = {"voip":{"channel_id":"1", "command":"dial"}}
@@ -396,13 +396,13 @@ def test_pushkit(sandbox):
         client.send_notification(token, payload, topic)
 
         time.sleep(1)
-    except OpenSSL.SSL.Error, e:
+    except OpenSSL.SSL.Error as e:
         err = e.message[0][2]
-        print "certificate expired" in err
-        print "ssl exception:", e, type(e), dir(e), e.args, e.message
+        print("certificate expired" in err)
+        print("ssl exception:", e, type(e), dir(e), e.args, e.message)
         raise e
-    except Exception, e:
-        print "exception:", e, type(e), dir(e), e.args, e.message
+    except Exception as e:
+        print("exception:", e, type(e), dir(e), e.args, e.message)
         raise e    
 
     

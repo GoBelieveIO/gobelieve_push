@@ -103,7 +103,7 @@ class WXPush(object):
     @classmethod
     def get_wx_app(cls, appid):
         now = int(time.time())
-        app = cls.apps[appid] if cls.apps.has_key(appid) else None
+        app = cls.apps.get(appid)
         EXPIRE = 5*60
         if app is None or now - app['timestamp'] > EXPIRE:
             obj = application.get_wx(cls.mysql, appid)
@@ -240,12 +240,12 @@ class WXPush(object):
             return False
 
         obj = json.loads(content)
-        if obj.has_key("text"):
+        if "text" in obj:
             alert = obj["text"]
             return WXPush.send_text(token, openid, alert)
-        elif obj.has_key("audio"):
+        elif "audio" in obj:
             return WXPush.send_voice(token, openid, obj['audio']['url'])
-        elif obj.has_key("image"):
+        elif "image" in obj:
             return WXPush.send_image(token, openid, obj['image'])
         else:
             alert = u"你收到了一条消息"

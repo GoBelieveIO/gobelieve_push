@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import requests
-import requesocks
 import json
 import logging
 import time

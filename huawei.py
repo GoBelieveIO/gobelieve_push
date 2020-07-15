@@ -3,7 +3,7 @@ import requests
 import json
 import time
 import logging
-from urllib import quote
+from urllib import parse
 from models import application
 
 #接口文档
@@ -21,7 +21,7 @@ class HuaWeiPush:
     @classmethod
     def get_app(cls, appid):
         now = int(time.time())
-        app = cls.hw_apps[appid] if cls.hw_apps.has_key(appid) else None
+        app = cls.hw_apps.get(appid)
         #app不在缓存中或者缓存超时,从数据库获取最新的accessid和secretkey
         if app is None or now - app["timestamp"] > 60:
             hw_appid, hw_app_secret = application.get_hw_key(cls.mysql, appid)
@@ -43,7 +43,7 @@ class HuaWeiPush:
     @classmethod
     def get_access_token(cls, hw_appid, hw_app_secret):
         hw_token = cls.hw_token
-        if hw_token.has_key("access_token") and hw_token.has_key("expire"):
+        if "access_token" in hw_token and "expire" in hw_token:
             now = int(time.time())
             #未过期,预留10秒
             if hw_token["expire"] > now + 10:
@@ -77,7 +77,7 @@ class HuaWeiPush:
         }
         headers = {"Content-Type":"application/x-www-form-urlencoded"}
         nsp_ctx = """{"ver":"1", "appId":"%s"}"""%hw_appid
-        url = "%s?nsp_ctx=%s"%(HUAWEI_URL, quote(nsp_ctx))
+        url = "%s?nsp_ctx=%s"%(HUAWEI_URL, parse.quote_plus(nsp_ctx))
         
         resp = cls.session.post(url, data=data, headers=headers)
         if resp.status_code != 200:
@@ -155,6 +155,6 @@ if __name__ == "__main__":
     package_name = "io.gobelieve.im.demo"
     token = "AMbVYVLOLNa2ImG1kDS8LqFaEqXLqUz6o0L64_oXLCxbkuFoYEX3OXEagWDrMCtJUC5XHmin4m3PqObIAI4ZflbipE5kLUfKKbtbuaBpiCWjbsAySmAkaVcKhy2iLBZ8YA"
     access_token = HuaWeiPush.get_access_token(APP_ID, APP_SECRET)
-    print "token:", access_token
+    print("token:", access_token)
     HuaWeiPush.send(access_token, token, "test", "测试华为推送", APP_ID, package_name)
     HuaWeiPush.send_message(access_token, token, {"key":"测试华为透传消息"}, APP_ID)

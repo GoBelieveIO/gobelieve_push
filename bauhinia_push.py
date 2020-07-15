@@ -1,17 +1,15 @@
+#!/usr/bin/env python3
+
 # -*- coding: utf-8 -*-
 import time
 import logging
 import sys
-
-reload(sys)
-sys.setdefaultencoding("utf-8")
-
 import redis
 import json
 import config
 import traceback
 import requests
-from urllib import urlencode
+from urllib import parse
 from apns2.payload import Payload
 
 from utils import mysql
@@ -22,7 +20,6 @@ from huawei import HuaWeiPush
 from fcm_push import FCMPush
 from mipush import MiPush
 from wx_push import WXPush
-from ali_push import AliPush
 from jgpush import JGPush
 from models import application
 from models import user
@@ -44,7 +41,6 @@ XGPush.mysql = mysql_db
 HuaWeiPush.mysql = mysql_db
 FCMPush.mysql = mysql_db
 MiPush.mysql = mysql_db
-AliPush.mysql = mysql_db
 JGPush.mysql = mysql_db
 WXPush.mysql = mysql_db
 WXPush.rds = rds
@@ -67,12 +63,12 @@ class Store(object):
 
 
 def get_title(appid):
-    if not app_names.has_key(appid):
+    if appid not in app_names:
         name = application.get_app_name(mysql_db, appid)
         if name is not None:
             app_names[appid] = name
 
-    if app_names.has_key(appid):
+    if appid in app_names:
         return app_names[appid]
     else:
         return ""
@@ -82,11 +78,11 @@ def push_content(sender_name, body):
     if not sender_name:
         try:
             content = json.loads(body)
-            if content.has_key("text"):
+            if "text" in content:
                 alert = content["text"]
-            elif content.has_key("audio"):
+            elif "audio" in  content:
                 alert = u"你收到了一条消息"
-            elif content.has_key("image"):
+            elif "image" in content or "image2" in content:
                 alert = u"你收到了一张图片"
             else:
                 alert = u"你收到了一条消息"
@@ -98,11 +94,11 @@ def push_content(sender_name, body):
         try:
             sender_name = sender_name.decode("utf8")
             content = json.loads(body)
-            if content.has_key("text"):
+            if "text" in content:
                 alert = "%s:%s"%(sender_name, content["text"])
-            elif content.has_key("audio"):
+            elif "audio" in content:
                 alert = "%s%s"%(sender_name, u"发来一条语音消息")
-            elif content.has_key("image"):
+            elif "image" in content or "image2" in content:                
                 alert = "%s%s"%(sender_name, u"发来一张图片")
             else:
                 alert = "%s%s"%(sender_name, u"发来一条消息")
@@ -123,9 +119,9 @@ def post_system_message(appid, uid, content):
         "uid":uid
     }
     im_url=config.IM_RPC_URL
-    url = im_url + "/post_system_message?" + urlencode(params)
+    url = im_url + "/post_system_message"
     headers = {"Content-Type":"text/plain; charset=UTF-8"}
-    resp = requests.post(url, data=content.encode("utf8"), headers=headers)
+    resp = requests.post(url, data=content.encode("utf8"), headers=headers, params=params)
     logging.debug("post system message:%s", resp.status_code == 200)
 
     
@@ -152,11 +148,6 @@ def push_customer_support_message(appid, appname, u, content, extra):
         HuaWeiPush.push(appid, appname, u.hw_device_token, content)
     elif u.gcm_device_token and u.gcm_timestamp == ts:
         FCMPush.push(appid, appname, u.gcm_device_token, content)
-    elif u.ali_device_token and u.ali_timestamp == ts:
-        AliPush.push(appid, appname, u.ali_device_token, content)
-        #通过透传消息通知app有新消息到达
-        content = json.dumps({"xiaowei":{"new":1}})
-        AliPush.push_message(appid, appname, u.ali_device_token, content)
     elif u.jp_device_token and u.jp_timestamp == ts:
         JGPush.push(appid, appname, u.jp_device_token, content)
     else:
@@ -185,8 +176,6 @@ def push_message_u(appid, appname, u, content, extra, collapse_id=None):
         HuaWeiPush.push(appid, appname, u.hw_device_token, content)
     elif u.gcm_device_token and u.gcm_timestamp == ts:
         FCMPush.push(appid, appname, u.gcm_device_token, content)
-    elif u.ali_device_token and u.ali_timestamp == ts:
-        AliPush.push(appid, appname, u.ali_device_token, content)
     elif u.jp_device_token and u.jp_timestamp == ts:
         JGPush.push(appid, appname, u.jp_device_token, content)
     else:
@@ -206,9 +195,9 @@ def handle_im_messages(msgs):
     msg_objs = []
     for msg in msgs:
         obj = json.loads(msg)
-        if not obj.has_key("appid") or \
-                not obj.has_key("sender") or \
-                not obj.has_key("receiver"):
+        if "appid" not in obj or \
+           "sender" not in obj or \
+           "receiver" not in obj:
             logging.warning("invalid push msg:%s", msg)
             continue
 
@@ -282,9 +271,6 @@ def handle_im_messages(msgs):
     for u, appname, content, _ in gcm_users:
         FCMPush.push(u.appid, appname, u.gcm_device_token, content)
 
-    for u, appname, content, _ in ali_users:
-        AliPush.push(u.appid, appname, u.ali_device_token, content)
-
     for u, appname, content, _ in jp_users:
         JGPush.push(u.appid, appname, u.jp_device_token, content)
 
@@ -310,9 +296,9 @@ def handle_im_messages(msgs):
 # 已不再使用
 def handle_im_message(msg):
     obj = json.loads(msg)
-    if not obj.has_key("appid") or \
-       not obj.has_key("sender") or \
-       not obj.has_key("receiver"):
+    if "appid" not in obj or \
+       "sender" not in obj or \
+       "receiver" not in obj:    
         logging.warning("invalid push msg:%s", msg)
         return
 
@@ -356,7 +342,7 @@ def send_group_message(obj):
     try:
         c = json.loads(obj["content"])
         collapse_id = c.get('uuid')
-        if c.has_key('revoke'):
+        if "revoke" in c:
             collapse_id = c['revoke']['msgid']
             sender_name = sender_name if sender_name else ''
             content = "%s撤回了一条消息" % sender_name
@@ -469,8 +455,8 @@ def handle_group_messages(msgs):
     msg_objs = []
     for msg in msgs:
         obj = json.loads(msg)
-        if not obj.has_key("appid") or not obj.has_key("sender") or \
-                not obj.has_key("receivers") or not obj.has_key("group_id"):
+        if "appid" not in obj or "sender" not in obj or \
+           "receivers" not in obj or "group_id" not in obj:
             logging.warning("invalid push msg:%s", msg)
             continue
         msg_objs.append(obj)
@@ -506,8 +492,8 @@ def handle_group_messages(msgs):
 
 def handle_group_message(msg):
     obj = json.loads(msg)
-    if not obj.has_key("appid") or not obj.has_key("sender") or \
-       not obj.has_key("receivers") or not obj.has_key("group_id"):
+    if "appid" not in obj or "sender" not in obj or \
+       "receivers" not in obj or "group_id" not in obj:    
         logging.warning("invalid push msg:%s", msg)
         return
 
@@ -517,10 +503,11 @@ def handle_group_message(msg):
 
 def handle_customer_message(msg):
     obj = json.loads(msg)
-    if not obj.has_key("appid") or not obj.has_key("command") or \
-       not obj.has_key("customer_appid") or not obj.has_key("customer") or \
-       not obj.has_key("seller") or not obj.has_key("content") or \
-       not obj.has_key("store") or not obj.has_key("receiver"):
+
+    if "appid" not in obj or "command" not in obj or \
+       "customer_appid" not in obj or "customer" not in obj or \
+       "seller" not in obj or "content" not in obj or \
+       "store" not in obj or "receiver" not in obj:
         logging.warning("invalid customer push msg:%s", msg)
         return
 
@@ -593,7 +580,7 @@ def handle_system_message(msg):
         if not voip_content and not content:
             return
         sound = content_obj.get('sound', 'default')
-    except Exception, e:
+    except Exception as e:
         logging.info("exception:%s", e)
         return
     
@@ -623,8 +610,6 @@ def handle_system_message(msg):
         MiPush.push_message(appid, u.mi_device_token, content)
     elif u.hw_device_token and u.hw_timestamp == ts:
         HuaWeiPush.push_message(appid, u.hw_device_token, content)
-    elif u.ali_device_token and u.ali_timestamp == ts:
-        AliPush.push_message(appid, appname, u.hw_device_token, content)
     else:
         logging.info("uid:%d has't device token", receiver)
         
@@ -719,7 +704,7 @@ def main():
     while True:
         try:
             receive_offline_message()
-        except Exception, e:
+        except Exception as e:
             print_exception_traceback()
             time.sleep(1)
             continue

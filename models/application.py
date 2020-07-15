@@ -15,7 +15,7 @@ def get_app_name(mysql, appid):
             cursor = mysql.execute(sql, appid)
             obj = cursor.fetchone()
             return obj["name"]
-        except Exception, e:
+        except Exception as e:
             logging.info("exception:%s", str(e))
             continue
     return ""
@@ -33,7 +33,7 @@ def get_bundle_id(mysql, appid):
                 return bundle_id
             else:
                 return None
-        except Exception, e:
+        except Exception as e:
             traceback.print_exc(file=sys.stdout)
             logging.info("exception:%s", str(e))
             continue
@@ -53,7 +53,7 @@ def get_package_name(mysql, appid):
                 return bundle_id
             else:
                 return None
-        except Exception, e:
+        except Exception as e:
             traceback.print_exc(file=sys.stdout)
             logging.info("exception:%s", str(e))
             continue
@@ -79,7 +79,7 @@ def get_p12(mysql, sandbox, appid):
                 timestamp = obj["production_key_utime"]
 
             return p12, secret, timestamp
-        except Exception, e:
+        except Exception as e:
             traceback.print_exc(file=sys.stdout)
             logging.info("exception:%s", str(e))
             continue
@@ -100,7 +100,7 @@ def get_pushkit_p12(mysql, appid):
             timestamp = obj["push_key_utime"]
 
             return p12, secret, timestamp
-        except Exception, e:
+        except Exception as e:
             traceback.print_exc(file=sys.stdout)
             logging.info("exception:%s", str(e))
             continue
@@ -117,7 +117,7 @@ def get_certificate(mysql, appid):
             cer = obj["cer"]
             key = obj["pkey"]
             return cer, key
-        except Exception, e:
+        except Exception as e:
             logging.info("exception:%s", str(e))
             continue
 
@@ -134,7 +134,7 @@ def get_xg_secret(mysql, appid):
             access_id = obj["access_id"]
             secret_key = obj["secret_key"]
             return access_id, secret_key
-        except Exception, e:
+        except Exception as e:
             logging.info("exception:%s", str(e))
             continue
 
@@ -151,7 +151,7 @@ def get_mi_key(mysql, appid):
             mi_appid = obj["appid"]
             mi_app_secret = obj["app_secret"]
             return mi_appid, mi_app_secret
-        except Exception, e:
+        except Exception as e:
             logging.info("exception:%s", str(e))
             continue
 
@@ -168,7 +168,7 @@ def get_hw_key(mysql, appid):
             hw_appid = obj["appid"]
             hw_app_secret = obj["app_secret"]
             return hw_appid, hw_app_secret
-        except Exception, e:
+        except Exception as e:
             logging.info("exception:%s", str(e))
             continue
 
@@ -185,7 +185,7 @@ def get_gcm_key(mysql, appid):
             sender_id = obj["sender_id"]
             api_key = obj["api_key"]
             return sender_id, api_key
-        except Exception, e:
+        except Exception as e:
             logging.info("exception:%s", str(e))
             continue
 
@@ -203,7 +203,7 @@ def get_wx(db, appid):
             r = db.execute(sql, appid)
             obj = r.fetchone()
             return obj
-        except Exception, e:
+        except Exception as e:
             logging.info("exception:%s", str(e))
             continue
 
@@ -219,7 +219,7 @@ def get_ali_key(mysql, appid):
             obj = cursor.fetchone()
             if obj:
                 return obj['ali_access_key_id'], obj['ali_access_secret'], obj['ali_app_key']
-        except Exception, e:
+        except Exception as e:
             logging.info("exception:%s", str(e))
             continue
 

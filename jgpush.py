@@ -59,7 +59,6 @@ class JGPush:
         else:
             logging.debug("send jg message success:%s", res.content)
                           
-        print res.content
         
 
     @classmethod

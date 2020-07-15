@@ -16,7 +16,7 @@ class MiPush:
     @classmethod
     def get_app(cls, appid):
         now = int(time.time())
-        app = cls.mi_apps[appid] if cls.mi_apps.has_key(appid) else None
+        app = cls.mi_apps.get(appid)
         #app不在缓存中或者缓存超时,从数据库获取最新的app_secret
         if app is None or now - app["timestamp"] > 60:
             mi_appid, mi_app_secret = application.get_mi_key(cls.mysql, appid)
@@ -52,11 +52,10 @@ class MiPush:
             logging.error("send xiaomi message error")
         else:
             obj = json.loads(res.content)
-            if obj.has_key("code") and obj["code"] == 0:
+            if obj.get("code") == 0:
                 logging.debug("send xiaomi message success")
             else:
                 logging.error("send xiaomi message error:%s", res.content)                
-        print res.content
         
     @classmethod
     def send_message(cls, mi_app_secret, device_token, payload):
@@ -74,12 +73,12 @@ class MiPush:
             logging.error("send xiaomi message error")
         else:
             obj = json.loads(res.content)
-            if obj.has_key("code") and obj["code"] == 0:
+            if obj.get("code") == 0:
                 logging.debug("send xiaomi message success")
             else:
                 logging.error("send xiaomi message error:%s", res.content)                
-        print res.content
 
+                
     @classmethod
     def push(cls, appid, appname, token, content):
         app = cls.get_app(appid)
