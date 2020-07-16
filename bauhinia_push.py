@@ -81,9 +81,13 @@ def push_content(sender_name, body):
             if "text" in content:
                 alert = content["text"]
             elif "audio" in  content:
-                alert = u"你收到了一条消息"
+                alert = u"你收到了一条语音消息"
             elif "image" in content or "image2" in content:
                 alert = u"你收到了一张图片"
+            elif "video" in content:
+                alert = u"你收到了一条视频消息"
+            elif "file" in content:
+                alert = u"你收到了一条文件消息"
             else:
                 alert = u"你收到了一条消息"
 
@@ -100,6 +104,10 @@ def push_content(sender_name, body):
                 alert = "%s%s"%(sender_name, u"发来一条语音消息")
             elif "image" in content or "image2" in content:                
                 alert = "%s%s"%(sender_name, u"发来一张图片")
+            elif "video" in content:
+                alert = "%s%s"%(sender_name, u"发来一条视频消息")
+            elif "file" in content:
+                alert = "%s%s"%(sender_name, u"发来一条文件消息")
             else:
                 alert = "%s%s"%(sender_name, u"发来一条消息")
 
@@ -232,6 +240,9 @@ def handle_im_messages(msgs):
             continue
 
         content_obj = json.loads(obj['content'])
+        if "readed" in content_obj or "tag" in content_obj:
+            continue
+        
         if content_obj.get('revoke'):
             collapse_id = content_obj.get('revoke').get('msgid')
             sender_name = sender_name if sender_name else ''
@@ -469,6 +480,9 @@ def handle_group_messages(msgs):
     for obj in msg_objs:
         c = json.loads(obj['content'])
 
+        if "readed" in obj or "tag" in c:
+            continue        
+        
         if 'revoke' in c:
             msg_uuid = c.get('revoke').get('msgid')
             if msg_uuid not in revoke_msgs_dict:
@@ -688,7 +702,6 @@ def receive_offline_message():
 
         if p_items:
             handle_im_messages(p_items)
-            pass
         if g_items:
             handle_group_messages(g_items)
         if c_items:
