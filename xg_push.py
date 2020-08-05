@@ -16,7 +16,7 @@ def GenSign(path, params, secretKey):
     ks = sorted(params.keys())
     paramStr = ''.join([('%s=%s' % (k, params[k])) for k in ks])
     signSource = u'%s%s%s%s%s' % (HTTP_METHOD, XINGE_HOST, path, paramStr, secretKey)
-    return hashlib.md5(signSource).hexdigest()
+    return hashlib.md5(signSource.encode("utf8")).hexdigest()
 
 class XGPush:
     session = requests.session()
@@ -27,7 +27,7 @@ class XGPush:
     @classmethod
     def get_xg_app(cls, appid):
         now = int(time.time())
-        app = cls.xg_apps[appid] if cls.xg_apps.has_key(appid) else None
+        app = cls.xg_apps[appid] if appid in cls.xg_apps else None
         #app不在缓存中或者缓存超时,从数据库获取最新的accessid和secretkey
         if app is None or now - app["timestamp"] > 60:
             access_id, secret_key = application.get_xg_secret(cls.mysql, appid)
