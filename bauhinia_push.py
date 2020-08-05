@@ -96,7 +96,6 @@ def push_content(sender_name, body):
 
     else:
         try:
-            sender_name = sender_name.decode("utf8")
             content = json.loads(body)
             if "text" in content:
                 alert = "%s:%s"%(sender_name, content["text"])
