@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 import requests
-import requesocks
+try:
+    import requesocks
+except ImportError:
+    pass
+
 import json
 import logging
 import time
@@ -58,13 +62,13 @@ class GCMPush:
             logging.debug("send gcm message success")
         
     @classmethod
-    def push(cls, appid, appname, token, content):
+    def push(cls, appid, title, token, content):
         app = cls.get_gcm_app(appid)
         if app is None:
             logging.warning("can't read gcm api key")
             return False
 
-        cls.send(app["api_key"], token, appname, content)
+        cls.send(app["api_key"], token, title, content)
 
 
 if __name__ == "__main__":

@@ -122,7 +122,7 @@ class HuaWeiPush:
 
 
     @classmethod
-    def push(cls, appid, appname, token, content):
+    def push(cls, appid, title, token, content):
         app = cls.get_app(appid)
         if app is None:
             logging.warning("")
@@ -132,7 +132,7 @@ class HuaWeiPush:
         if access_token is None:
             return
         
-        cls.send(access_token, token, appname, content, app["hw_appid"], app["package_name"])
+        cls.send(access_token, token, title, content, app["hw_appid"], app["package_name"])
 
 
     @classmethod

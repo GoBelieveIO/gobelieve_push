@@ -9,8 +9,7 @@ import json
 import config
 import traceback
 import requests
-from urllib import parse
-from apns2.payload import Payload
+from apns2.payload import Payload, PayloadAlert
 
 from utils import mysql
 from ios_push import Notification
@@ -23,6 +22,7 @@ from wx_push import WXPush
 from jgpush import JGPush
 from models import application
 from models import user
+from models import group
 
 
 
@@ -47,6 +47,12 @@ WXPush.rds = rds
 
 app_names = {}
 
+#群组名称缓存
+group_names = {}
+
+#名称缓存过期时间
+NAME_CACHE_EXPIRE = 5*60
+
 
 class Store(object):
     def __init__(self):
@@ -70,6 +76,22 @@ def get_title(appid):
 
     if appid in app_names:
         return app_names[appid]
+    else:
+        return ""
+
+
+def get_group_name(group_id):
+    now = time.time()
+    if group_id in group_names:
+        ts, name = group_names[group_id]
+        if now - ts > NAME_CACHE_EXPIRE:
+            group_names.pop(group_id)
+    if group_id not in group_names:
+        name = group.get_group_name(mysql_db, group_id)
+        if name:
+            group_names[group_id] = (now, name)
+    if group_id in group_names:
+        return group_names[group_id][1]
     else:
         return ""
 
@@ -346,8 +368,13 @@ def send_group_message(obj):
 
     appname = get_title(appid)
     sender_name = user.get_user_name(rds, appid, sender)
+    group_name = get_group_name(group_id)
+    title = group_name if group_name else appname
 
     content = push_content(sender_name, obj["content"])
+
+    if sender_name:
+        content = "%s:%s"%(sender_name, content)
 
     try:
         c = json.loads(obj["content"])
@@ -424,11 +451,11 @@ def send_group_message(obj):
         xg_push(appid, appname, u.xg_device_token, content, extra)
 
     for u in hw_users:
-        HuaWeiPush.push(appid, appname, u.hw_device_token, content)
+        HuaWeiPush.push(appid, title, u.hw_device_token, content)
 
     gcm_device_tokens = [u.gcm_device_token for u in gcm_users]
     if gcm_device_tokens:
-        FCMPush.push_batch(appid, appname, gcm_device_tokens, content)
+        FCMPush.push_batch(appid, title, gcm_device_tokens, content)
 
     for u in ali_users:
         AliPush.push(appid, appname, u.ali_device_token, content)
@@ -437,7 +464,8 @@ def send_group_message(obj):
     notifications = []
     for u in apns_users:
         sound = 'default'
-        payload = Payload(alert=content, sound=sound, badge=u.unread + 1, custom=extra)
+        alert = PayloadAlert(title=group_name, body=content)
+        payload = Payload(alert=alert, sound=sound, badge=u.unread + 1, custom=extra)
         token = u.apns_device_token
         n = Notification(token, payload, None)
         notifications.append(n)
@@ -460,7 +488,7 @@ def send_group_message(obj):
         tokens.append(u.mi_device_token)
 
     if tokens:
-        MiPush.push_batch(appid, appname, tokens, content)
+        MiPush.push_batch(appid, title, tokens, content)
 
 
 def handle_group_messages(msgs):

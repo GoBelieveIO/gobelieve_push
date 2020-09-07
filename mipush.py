@@ -80,7 +80,7 @@ class MiPush:
 
                 
     @classmethod
-    def push(cls, appid, appname, token, content):
+    def push(cls, appid, title, token, content):
         app = cls.get_app(appid)
         if app is None:
             logging.warning("can't read mi app secret")
@@ -88,7 +88,7 @@ class MiPush:
 
         mi_app_secret = app["mi_app_secret"]
         logging.debug("mi app secret:%s", mi_app_secret)
-        cls.send(mi_app_secret, [token], appname, content)
+        cls.send(mi_app_secret, [token], title, content)
 
     @classmethod
     def push_message(cls, appid, token, payload):
@@ -105,7 +105,7 @@ class MiPush:
         cls.send_message(mi_app_secret, token, payload)
 
     @classmethod
-    def push_batch(cls, appid, appname, tokens, content):
+    def push_batch(cls, appid, title, tokens, content):
         app = cls.get_app(appid)
         if app is None:
             logging.warning("can't read mi app secret")
@@ -113,7 +113,7 @@ class MiPush:
 
         mi_app_secret = app["mi_app_secret"]
         logging.debug("mi app secret:%s", mi_app_secret)
-        cls.send(mi_app_secret, tokens, appname, content)
+        cls.send(mi_app_secret, tokens, title, content)
 
         
     
