@@ -372,10 +372,7 @@ def send_group_message(obj):
     title = group_name if group_name else appname
 
     content = push_content(sender_name, obj["content"])
-
-    if sender_name:
-        content = "%s:%s"%(sender_name, content)
-
+    
     try:
         c = json.loads(obj["content"])
         collapse_id = c.get('uuid')
