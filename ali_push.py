@@ -84,5 +84,7 @@ if __name__ == "__main__":
 
     push = Push(os.getenv('ACCESS_KEY_ID'), os.getenv('ACCESS_SECRET'), os.getenv('APP_KEY'))
 
-    print AliPush.send(push, token, u"SDK测试", u"测试")
-    print AliPush.send_message(push, token, "测试透传标题", json.dumps({"xiaowei": {"new": 1}}))
+    r = AliPush.send(push, token, u"SDK测试", u"测试")
+    print(r)
+    r = AliPush.send_message(push, token, "测试透传标题", json.dumps({"xiaowei": {"new": 1}}))
+    print(r)

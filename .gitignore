@@ -5,3 +5,4 @@
 .idea/
 /config.py
 /push/config.py
+*.p12

@@ -81,7 +81,7 @@ class SmartPush(object):
         if not apns:
             apns = cls.connect(appid)
             if not apns:
-                logging.warn("get p12 fail client id:%s", client_id)
+                logging.warning("get p12 fail client id:%s", client_id)
                 return None
             cls.apns_manager.set_apns_connection(appid, apns)
         return apns
@@ -100,7 +100,7 @@ class SmartPush(object):
          
         for i in range(2):
             if i == 1:
-                logging.warn("resend notification")
+                logging.warning("resend notification")
             try:
                 npush_conn = cls.get_connection(appid)
                 if npush_conn is None:
@@ -122,4 +122,4 @@ class SmartPush(object):
 
 def print_exception_traceback():
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    logging.warn("exception traceback:%s", traceback.format_exc())
+    logging.warning("exception traceback:%s", traceback.format_exc())

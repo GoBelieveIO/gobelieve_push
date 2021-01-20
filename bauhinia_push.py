@@ -751,7 +751,7 @@ def main():
 
 def print_exception_traceback():
     exc_type, exc_value, exc_traceback = sys.exc_info()
-    logging.warn("exception traceback:%s", traceback.format_exc())
+    logging.warning("exception traceback:%s", traceback.format_exc())
 
 
 def init_logger():
