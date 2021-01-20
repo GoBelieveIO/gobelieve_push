@@ -23,7 +23,13 @@ from jgpush import JGPush
 from models import application
 from models import user
 from models import group
+from models.conversation import Conversation
 
+if getattr(config, "ALI_PUSH", None):
+    ENABLE_ALI_PUSH = True
+    from ali_push import AliPush
+else:
+    ENABLE_ALI_PUSH = False
 
 
 MSG_CUSTOMER = 24 #顾客->客服
@@ -249,10 +255,9 @@ def handle_im_messages(msgs):
         appname = get_title(appid)
         sender_name = user.get_user_name(rds, appid, sender)
 
-
-        do_not_disturb = user.get_user_do_not_disturb(rds, appid, receiver, sender)
+        do_not_disturb = Conversation.get_do_not_disturb(rds, appid, receiver, peer_id=sender)
         if do_not_disturb:
-            logging.debug("uid:%s set do not disturb :%s", receiver, sender)
+            logging.debug("uid:%s do not disturb :%s", receiver, sender)
             continue
 
         u = user.get_user(rds, appid, receiver)
@@ -344,9 +349,9 @@ def handle_im_message(msg):
     extra = {}
     extra["sender"] = sender
 
-    do_not_disturb = user.get_user_do_not_disturb(rds, appid, receiver, sender)
+    do_not_disturb = Conversation.get_do_not_disturb(rds, appid, receiver, peer_id=sender)
     if do_not_disturb:
-        logging.debug("uid:%s set do not disturb :%s", receiver, sender)
+        logging.debug("uid:%s do not disturb :%s", receiver, sender)
         return
 
     content_obj = json.loads(obj['content'])
@@ -402,11 +407,11 @@ def send_group_message(obj):
     # 群聊中被at的用户
     at_users = []
     for receiver in receivers:
-        quiet = user.get_user_notification_setting(rds, appid, receiver, group_id)
-        if quiet:
+        do_not_disturb = Conversation.get_do_not_disturb(rds, appid, receiver, group_id=group_id)
+        if do_not_disturb:
             logging.info("uid:%d group id:%d do not disturb", receiver, group_id)
 
-        if quiet and receiver not in at:
+        if do_not_disturb and receiver not in at:
             continue
 
         u = user.get_user(rds, appid, receiver)
@@ -530,6 +535,7 @@ def handle_group_messages(msgs):
         send_group_message(obj)
 
 
+# 废弃
 def handle_group_message(msg):
     obj = json.loads(msg)
     if "appid" not in obj or "sender" not in obj or \
