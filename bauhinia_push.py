@@ -694,6 +694,7 @@ def receive_offline_message():
         begin = time.time()
         p_items = []
         g_items = []
+        c0_items = []
         c_items = []
         s_items = []
         while True:
@@ -704,6 +705,8 @@ def receive_offline_message():
                 break
             if len(g_items) >= 500:
                 break
+            if len(c0_items) >= 100:
+                break
             if len(c_items) >= 100:
                 break
             if len(s_items) >= 100:
@@ -712,22 +715,25 @@ def receive_offline_message():
             pipe = rds.pipeline()
             pipe.lpop("push_queue")
             pipe.lpop("group_push_queue")
+            pipe.lpop("customer_push_queue")
             pipe.lpop("customer_push_queue_v2")
             pipe.lpop("system_push_queue")
-            pipe.lpop("customer_push_queue")
-            p_item, g_item, c_item, s_item, _ = pipe.execute()
+
+            p_item, g_item, c0_item, c_item, s_item = pipe.execute()
             if p_item:
                 p_items.append(p_item)
             if g_item:
                 g_items.append(g_item)
+            if c0_item:
+                c0_items.append(c0_item)
             if c_item:
                 c_items.append(c_item)
             if s_item:
                 s_items.append(s_item)
 
-            if not p_items and not g_items and not c_items and not s_items:
+            if not p_items and not g_items and not c0_items and not c_items and not s_items:
                 break
-            elif p_item or g_item or c_item or s_item:
+            elif p_item or g_item or c0_item or c_item or s_item:
                 continue
 
             # 取到第一条之后，未取到下一条消息，等待一段时间
@@ -738,9 +744,10 @@ def receive_offline_message():
             timeout = 0.1 - (now - begin)
             time.sleep(timeout)
 
-        if not p_items and not g_items and not c_items and not s_items:
+        if not p_items and not g_items and not c0_items and not c_items and not s_items:
             item = rds.blpop(("push_queue",
                               "group_push_queue",
+                              "customer_push_queue",
                               "customer_push_queue_v2",
                               "system_push_queue"), 120)
             if item:
@@ -749,6 +756,8 @@ def receive_offline_message():
                     p_items.append(msg)
                 elif q == "group_push_queue":
                     g_items.append(msg)
+                elif q == "customer_push_queue":
+                    c0_items.append(msg)
                 elif q == "customer_push_queue_v2":
                     c_items.append(msg)
                 elif q == "system_push_queue":
@@ -760,6 +769,9 @@ def receive_offline_message():
             handle_im_messages(p_items)
         if g_items:
             handle_group_messages(g_items)
+        if c0_items:
+            for msg in c0_items:
+                handle_customer_message(msg)
         if c_items:
             for msg in c_items:
                 handle_customer_message_v2(msg)
