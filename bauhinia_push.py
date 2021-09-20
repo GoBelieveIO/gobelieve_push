@@ -159,38 +159,8 @@ def post_system_message(appid, uid, content):
     resp = requests.post(url, data=content.encode("utf8"), headers=headers, params=params)
     logging.debug("post system message:%s", resp.status_code == 200)
 
-    
-def push_customer_support_message(appid, appname, u, content, extra):
-    receiver = u.uid
-    #找出最近绑定的token
-    ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp, 
-             u.mi_timestamp, u.hw_timestamp, u.gcm_timestamp,
-             u.ali_timestamp, u.jp_timestamp)
 
-    if u.apns_device_token and u.apns_timestamp == ts:
-        sound = 'default'
-        alert = content
-        badge = u.unread + 1
-        content_available = 1
-        IOSPush.push(appid, u.apns_device_token, alert, 
-                     sound, badge, content_available, extra)
-        user.set_user_unread(rds, appid, receiver, u.unread+1)
-    elif u.xg_device_token and u.xg_timestamp == ts:
-        xg_push(appid, appname, u.xg_device_token, content, extra)
-    elif u.mi_device_token and u.mi_timestamp == ts:
-        MiPush.push(appid, appname, u.mi_device_token, content)
-    elif u.hw_device_token and u.hw_timestamp == ts:
-        HuaWeiPush.push(appid, appname, u.hw_device_token, content)
-    elif u.gcm_device_token and u.gcm_timestamp == ts:
-        FCMPush.push(appid, appname, u.gcm_device_token, content)
-    elif u.jp_device_token and u.jp_timestamp == ts:
-        JGPush.push(appid, appname, u.jp_device_token, content)
-    else:
-        logging.info("uid:%d has't device token", receiver)
-
-
-
-def push_message_u(appid, appname, u, content, extra, collapse_id=None):
+def push_message_u(appid, appname, u, content, extra, collapse_id=None, content_available=None):
     receiver = u.uid
     #找出最近绑定的token
     ts = max(u.apns_timestamp, u.xg_timestamp, u.ng_timestamp,
@@ -201,7 +171,8 @@ def push_message_u(appid, appname, u, content, extra, collapse_id=None):
         sound = 'default'
         IOSPush.push(appid, u.apns_device_token, content,
                      sound=sound, badge=u.unread+1,
-                     extra=extra, collapse_id=collapse_id)
+                     extra=extra, collapse_id=collapse_id,
+                     content_available=content_available)
         user.set_user_unread(rds, appid, receiver, u.unread+1)
     elif u.xg_device_token and u.xg_timestamp == ts:
         xg_push(appid, appname, u.xg_device_token, content, extra)
@@ -214,7 +185,11 @@ def push_message_u(appid, appname, u, content, extra, collapse_id=None):
     elif u.jp_device_token and u.jp_timestamp == ts:
         JGPush.push(appid, appname, u.jp_device_token, content)
     else:
-        logging.info("uid:%d has't device token", receiver)
+        logging.info("appid:%d uid:%d has't device token", appid, receiver)
+
+
+def push_customer_support_message(appid, appname, u, content, extra):
+    push_message_u(appid, appname, u, content, extra, content_available=1)
 
 
 def push_message(appid, appname, receiver, content, extra, collapse_id=None):
@@ -547,6 +522,55 @@ def handle_group_message(msg):
     send_group_message(obj)
 
 
+def handle_customer_message_v2(msg):
+    obj = json.loads(msg)
+    if "appid" not in obj or "content" not in obj or \
+       "sender_appid" not in obj or "sender" not in obj or \
+       "receiver_appid" not in obj or "receiver" not in obj:
+        logging.warning("invalid customer push msg:%s", msg)
+        return
+
+    logging.debug("customer push msg:%s", msg)
+
+    appid = obj["appid"]
+    sender_appid = obj["sender_appid"]
+    sender = obj["sender"]
+    receiver_appid = obj["receiver_appid"]
+    receiver = obj["receiver"]
+    raw_content = obj["content"]
+
+    assert(appid == receiver_appid)
+
+    extra = {}
+    appname = get_title(appid)
+    u = user.get_user(rds, appid, receiver)
+    if u is None:
+        logging.info("uid:%d nonexist", receiver)
+        return
+
+    if u.wx_openid:
+        result = WXPush.push(appid, appname, u.wx_openid, raw_content)
+        # errcode=45015,
+        # errmsg=response out of time limit or subscription is canceled
+        if result and result.get('errcode') == 45015:
+            now = int(time.time())
+            content_obj = {
+                "wechat": {
+                    "customer_appid": receiver_appid,
+                    "customer_id": receiver,
+                    "timestamp": now,
+                    "notification": "微信会话超时"
+                }
+            }
+            post_system_message(sender_appid, sender, json.dumps(content_obj))
+    else:
+        extra['xiaowei'] = {"new": 1}
+        sender_name = user.get_user_name(rds, sender_appid, sender)
+        content = push_content(sender_name, raw_content)
+        push_customer_support_message(appid, appname, u, content, extra)
+
+
+# 废弃
 def handle_customer_message(msg):
     obj = json.loads(msg)
 
@@ -658,7 +682,7 @@ def handle_system_message(msg):
         HuaWeiPush.push_message(appid, u.hw_device_token, content)
     else:
         logging.info("uid:%d has't device token", receiver)
-        
+
 
 def receive_offline_message():
     """
@@ -688,9 +712,10 @@ def receive_offline_message():
             pipe = rds.pipeline()
             pipe.lpop("push_queue")
             pipe.lpop("group_push_queue")
-            pipe.lpop("customer_push_queue")
+            pipe.lpop("customer_push_queue_v2")
             pipe.lpop("system_push_queue")
-            p_item, g_item, c_item, s_item = pipe.execute()
+            pipe.lpop("customer_push_queue")
+            p_item, g_item, c_item, s_item, _ = pipe.execute()
             if p_item:
                 p_items.append(p_item)
             if g_item:
@@ -716,7 +741,7 @@ def receive_offline_message():
         if not p_items and not g_items and not c_items and not s_items:
             item = rds.blpop(("push_queue",
                               "group_push_queue",
-                              "customer_push_queue",
+                              "customer_push_queue_v2",
                               "system_push_queue"), 120)
             if item:
                 q, msg = item
@@ -724,7 +749,7 @@ def receive_offline_message():
                     p_items.append(msg)
                 elif q == "group_push_queue":
                     g_items.append(msg)
-                elif q == "customer_push_queue":
+                elif q == "customer_push_queue_v2":
                     c_items.append(msg)
                 elif q == "system_push_queue":
                     s_items.append(msg)
@@ -737,7 +762,7 @@ def receive_offline_message():
             handle_group_messages(g_items)
         if c_items:
             for msg in c_items:
-                handle_customer_message(msg)
+                handle_customer_message_v2(msg)
         if s_items:
             for msg in s_items:
                 handle_system_message(msg)
