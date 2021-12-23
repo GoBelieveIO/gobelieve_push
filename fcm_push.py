@@ -5,10 +5,11 @@ from fcm import FCMNotification
 from models import application
 import config
 
+
 proxy_dict = {
     "http":config.SOCKS5_PROXY,
     "https":config.SOCKS5_PROXY
-}
+} if config.SOCKS5_PROXY else None
 
 class FCMPush:
     fcm = FCMNotification(proxy_dict=proxy_dict)    
