@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
 import logging
 import time
-from fcm import FCMNotification
+from pyfcm import FCMNotification
 from models import application
 import config
 
 
-proxy_dict = {
-    "http":config.SOCKS5_PROXY,
-    "https":config.SOCKS5_PROXY
-} if config.SOCKS5_PROXY else None
-
 class FCMPush:
-    fcm = FCMNotification(proxy_dict=proxy_dict)    
     mysql = None
     fcm_apps = {}
     @classmethod
@@ -29,13 +23,18 @@ class FCMPush:
             app["sender_id"] = sender_id
             app["api_key"] = api_key
             app["appid"] = appid
+            app["fcm"] = FCMNotification(api_key=api_key)            
             cls.fcm_apps[appid] = app
 
         return app
+
+
     
     @classmethod
-    def send(cls, api_key, device_token, title, content):
-        res = cls.fcm.notify_single_device(api_key=api_key, registration_id=device_token, message_title=title, message_body=content)
+    def send(cls, fcm, device_token, title, content, channel_id=None):
+        logging.info("fcm send:%s %s %s %s", device_token, title, content, channel_id)
+        res = fcm.notify_single_device(registration_id=device_token, message_title=title,
+                                       message_body=content, android_channel_id=channel_id)
         if res["failure"] > 0:
             logging.error("send fcm message error:%s", res)
         else:
@@ -43,8 +42,9 @@ class FCMPush:
 
    
     @classmethod
-    def send_batch(cls, api_key, device_tokens, title, content):
-        res = cls.fcm.notify_multiple_devices(api_key=api_key, registration_ids=device_tokens, message_title=title, message_body=content)
+    def send_batch(cls, fcm, device_tokens, title, content, channel_id=None):
+        logging.info("fcm send batch:%s %s %s %s", device_tokens, title, content, channel_id)        
+        res = fcm.notify_multiple_devices(registration_ids=device_tokens, message_title=title, message_body=content, android_channel_id=channel_id)
         if res["failure"] > 0:
             logging.error("send fcm message error:%s", res)
         else:
@@ -52,25 +52,24 @@ class FCMPush:
 
             
     @classmethod
-    def push(cls, appid, appname, token, content):
+    def push(cls, appid, appname, token, content, channel_id=None):
         app = cls.get_gcm_app(appid)
         if app is None:
             logging.warning("can't read gcm api key")
             return False
 
-        cls.send(app["api_key"], token, appname, content)
+        cls.send(app["fcm"], token, appname, content, channel_id)
 
         
     @classmethod
-    def push_batch(cls, appid, appname, tokens, content):
+    def push_batch(cls, appid, appname, tokens, content, channel_id=None):
         app = cls.get_gcm_app(appid)
         if app is None:
             logging.warning("can't read gcm api key")
             return False
 
-        cls.send_batch(app["api_key"], tokens, appname, content)
+        cls.send_batch(app["fcm"], tokens, appname, content, channel_id)
 
-        
 
 if __name__ == "__main__":
     logging.getLogger().setLevel(logging.DEBUG)

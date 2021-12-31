@@ -1,8 +1,7 @@
 xmltodict
-requesocks
 pyopenssl>=18.0.0
 apns2>=0.7.1
-requests[socks]>=2.23.0
 redis>=2.10.5
 PyMySQL>=0.8.1
+pyfcm>=1.5.4
 
