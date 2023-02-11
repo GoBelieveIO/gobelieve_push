@@ -5,6 +5,7 @@ from OpenSSL import crypto
 import os
 import threading
 from models import application
+from utils.credentials import CertificateCredentials
 import config
 import time
 import tempfile
@@ -123,7 +124,7 @@ class IOSPush(object):
         try:
             os.write(f, pub_key)
             os.write(f, priv_key)
-            client = APNsClient(path, use_sandbox=sandbox, use_alternative_port=False)
+            client = APNsClient(CertificateCredentials(path), use_sandbox=sandbox, use_alternative_port=False)
             return client
         finally:
             os.close(f)
